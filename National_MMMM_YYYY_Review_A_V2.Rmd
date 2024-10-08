@@ -1,0 +1,4786 @@
+---
+title: "National Acute Hospital Review"
+subtitle: "Emergency Department"
+date: "March 2020"
+output:
+  powerpoint_presentation:
+    reference_doc: myStyle.pptx
+---
+
+## Contents
+
+```{r setup, echo=FALSE, warning=FALSE, message=FALSE, eval=TRUE}
+library(formattable)
+library(dplyr)
+library(tidyr)
+library(plotly)
+library(reshape2)
+library(extrafont)
+library(scales)
+library(gtable)
+library(grid)
+
+grid_line = element_line(size = 2, color = "grey50")
+
+knitr::opts_chunk$set(warning = FALSE, error = FALSE, message = FALSE, echo = FALSE, fig.height = 50, fig.width = 90, eval=TRUE)
+
+read.csv(file = "~/discharge_codes.csv", stringsAsFactors = FALSE) %>%  subset(admit_status == "Admitted") %>%  pull(discharge_destination) -> admDests
+
+read.csv(file = "~/MyColors.csv", stringsAsFactors = FALSE) %>% 
+  
+  subset(color == "blue") %>% pull(code) -> blue
+
+read.csv(file = "~/MyColors.csv", stringsAsFactors = FALSE) %>% 
+  
+  subset(color == "red") %>% pull(code) -> red
+
+read.csv(file = "~/MyColors.csv", stringsAsFactors = FALSE) %>% 
+  
+  subset(color == "green") %>% pull(code) -> green
+
+read.csv(file = "~/MyColors.csv", stringsAsFactors = FALSE) %>% 
+  
+  subset(color == "orange") %>% pull(code) -> orange
+
+read.csv(file = "~/MyColors.csv", stringsAsFactors = FALSE) %>% 
+  
+  subset(color == "lightblue") %>% pull(code) -> lightblue
+
+read.csv(file = "~/MyColors.csv", stringsAsFactors = FALSE) %>% 
+  
+  subset(color == "yellow") %>% pull(code) -> yellow
+
+read.csv(file = "~/MyColors.csv", stringsAsFactors = FALSE) %>% subset(color == "lightbluegrey") %>% pull(code) -> lightbluegrey
+
+x = element_blank()
+f1 = element_text(family = "Trebuchet MS", color = "grey31", size = 100)
+rotated_f1 = element_text(family = "Trebuchet MS", color = "grey31", size = 100, angle = 90)
+title_style = element_text(family = "Trebuchet MS", color = "grey31", size = 110, vjust = 1, face = "bold")
+subtitle_style = element_text(family = "Trebuchet MS", color = "grey31", size = 100, face = "italic")
+txt_sz = 30
+line_sz = 5
+pnt_sz = 10
+legendFixFill = guides(fill = guide_legend(override.aes = list(size = 30)))
+legendFixColor = guides(color = guide_legend(override.aes = list(size = 30)))
+source(file = "~/jltable.R")
+```
+
+```{r toc, eval=FALSE}
+data.frame(section = c("<br>Executive Summary</br>", "<br>ED Attendances</br>", "<br>ED Admissions</br>", "<br>Quadrant Performance</br>", "<br>Patient Experience Time</br>", "<br>Trolleys</br>"),
+  
+           slidenumber = c("<br>3</br>", "<br>4</br>", "<br>15</br>", "<br>25</br>", "<br>29</br>", "<br>38</br>")
+) -> toc
+
+names(toc) = c("<b>Section</b>", "<b>Slide No.</b>")
+
+#toc %>% jltable(fileName = "toc.png")
+  
+toc %>%  
+  
+  plot_ly() %>%
+
+  add_table(
+  rownames = FALSE,
+  header = list(
+    align = list("left", "right"),
+    line = list(width = 0),
+    fill = list(color = lightbluegrey)
+  ),
+  cells = list(
+    align = list("left", "right"),
+    line = list(width = 0)
+  )
+) %>%
+
+  layout(
+  font = list(
+    family = "Trebuchet MS",
+    size = 150,
+    colour = "grey31"
+  )
+)
+```
+
+```{r toc1}
+data.frame(section = c("Executive Summary", "ED Attendances", "ED Admissions", "Quadrant Performance", "Patient Experience Time", "Trolleys"),
+           
+           slidenumber = c("3", "4", "15", "25", "29", "38")
+) %>%
+  
+  plot_ly() %>% 
+    
+    add_table(
+      rownames = FALSE,
+      header = list(
+        values = c("Section", "Slide No."),
+        height = 60,
+        align = list("left", "right"),
+        line = list(width = 0),
+        fill = list(color = "skyblue")
+      ),
+      cells = list(
+        height = 50,
+        align = list("left", "right"),
+        line = list(width = 0)
+      )
+    ) %>% 
+    
+    layout(
+      font = list(
+        family = "Trebuchet MS",
+        size = 25,
+        colour = "grey31"
+      ),
+      autosize = FALSE,
+      width = 1300,
+      height = 975,
+      margin = list(t = 5, b = 5, r = 5, l = 5)
+    ) %>% 
+    
+    export(file = "toc.png")
+```
+
+## Executive Summary
+
+```{r importEDData, eval=TRUE}
+source(file = "~/standard_format.R")
+
+edData = data.frame(
+  V1 = as.integer(), 
+  V2 = as.character(), 
+  V3 = as.character(), 
+  V4 = as.integer(), 
+  V5 = as.character(), 
+  V6 = as.character(), 
+  V7 = as.character(), 
+  V8 = as.character()
+)
+
+acuteIDs = read.csv(
+  file = "~/provider_codes.csv",
+  stringsAsFactors = FALSE
+) %>% 
+  subset(
+    acuteED == 1
+    & complete.cases(biu_hospital_id)
+  ) %>% 
+  arrange(biu_hospital_id) %>%
+  pull(biu_hospital_id)
+
+for(f in c(list.files(path = "C:/Users/jack.lyons/Downloads/PET_Data_01-MMM-YYYY_to_DD-MMM-YYYY/", full.names = TRUE, pattern = "2020"), list.files(path = "C:/Users/jack.lyons/Downloads/PET_Data_01-MMM-YYYY_to_DD-MMM-YYYY/", full.names = TRUE, pattern = "2019"))){
+
+  edData = rbind(edData, read.csv(file = f, stringsAsFactors = FALSE, header = FALSE) %>% subset(V1 %in% acuteIDs) %>% mutate(V3 = standard_format(V3), V7 = standard_format(V7)))
+  
+}
+
+edData = edData %>% distinct() %>% select(V1,V3,V4,V7,V8) %>% rename(biu_hospital_id = V1, reg = V3, age = V4, depart = V7, destination = V8)
+```
+
+```{r loadData}
+if(("edData" %in% ls()) == FALSE){
+  load("~/edData.RData")
+}
+```
+
+```{r summary, eval=FALSE}
+edData %>% subset(
+  reg == max(reg)
+) %>% pull(reg) %>% format("%m") %>% as.integer() -> M
+
+edData %>% subset(
+  reg == max(reg)
+) %>% pull(reg) %>% format("%Y") %>% as.integer() -> Y
+
+edData %>% subset(
+  as.integer(
+    format(
+      reg,
+      "%Y"
+    )
+  ) == Y
+  & as.integer(
+    format(
+      reg,
+      "%m"
+    )
+  ) == M
+) %>% nrow() -> monthattends
+
+edData %>% subset(
+  as.integer(
+    format(
+      reg,
+      "%Y"
+    )
+  ) == Y-1
+  & as.integer(
+    format(
+      reg,
+      "%m"
+    )
+  ) == M
+) %>% nrow() -> monthattendslastyear
+
+if(monthattends >= monthattendslastyear){
+  paste0(
+    "+",
+    round(
+      100*(monthattends - monthattendslastyear)/monthattendslastyear,
+      1
+    ),
+    "% compared to ",
+    format(
+      as.Date(
+        paste(
+          Y-1,
+          M,
+          1,
+          sep = "-"
+        )
+      ),
+      "%B %Y"
+    )
+  ) -> monthattendscomment
+} else {
+  paste0(
+    round(
+      100*(monthattends - monthattendslastyear)/monthattendslastyear,
+      1
+    ),
+    "% compared to ",
+    format(
+      as.Date(
+        paste(
+          Y-1,
+          M,
+          1,
+          sep = "-"
+        )
+      ),
+      "%B %Y"
+    )
+  ) -> monthattendscomment
+}
+
+edData %>% subset(
+  as.integer(
+    format(
+      reg,
+      "%Y"
+    )
+  ) == Y
+  & as.integer(
+    format(
+      reg,
+      "%m"
+    )
+  ) <= M
+) %>% nrow() -> ytdattends
+
+edData %>% subset(
+  as.integer(
+    format(
+      reg,
+      "%Y"
+    )
+  ) == Y-1
+  & as.integer(
+    format(
+      reg,
+      "%m"
+    )
+  ) <= M
+) %>% nrow() -> ytdattendslastyear
+
+paste0(
+  round(
+    100*(ytdattends - ytdattendslastyear)/ytdattendslastyear,
+    1
+  ),
+  "% YTD"
+) -> ytdattendscomment
+
+if(ytdattends >= ytdattendslastyear){
+  ytdattendscomment = paste0(
+    "+", 
+    ytdattendscomment
+  )
+}
+
+monthattendsvalue = format(
+  monthattends, 
+  big.mark = ","
+)
+
+ytdattendsvalue = format(
+  ytdattends,
+  big.mark = ","
+)
+
+edData %>% subset(
+  as.integer(
+    format(
+      depart,
+      "%Y"
+    )
+  ) == Y
+  & as.integer(
+    format(
+      depart,
+      "%m"
+    )
+  ) == M
+) %>% mutate(
+  pet = as.numeric(
+    difftime(
+      depart,
+      reg,
+      units = "hours"
+    )
+  ),
+  pet6 = ifelse(
+    pet < 6,
+    100,
+    0
+  )
+) %>% pull(pet6) %>% mean() %>% round(1) %>% paste0("%") -> pet6value
+
+if(M == 1){
+  edData %>% subset(
+    as.integer(
+      format(
+        depart,
+        "%Y"
+      )
+    ) == Y-1
+    & as.integer(
+      format(
+        depart,
+        "%m"
+      )
+    ) == 12
+  ) %>% mutate(
+    pet = as.numeric(
+      difftime(
+        depart,
+        reg,
+        units = "hours"
+      )
+    ),
+    pet6 = ifelse(
+      pet < 6,
+      100,
+      0
+    )
+  ) %>% pull(pet6) %>% mean() %>% round(1) %>% paste0("%") -> pet6valuelastmonth
+} else {
+  edData %>% subset(
+    as.integer(
+      format(
+        depart,
+        "%Y"
+      )
+    ) == Y
+    & as.integer(
+      format(
+        depart,
+        "%m"
+      )
+    ) == M-1
+  ) %>% mutate(
+    pet = as.numeric(
+      difftime(
+        depart,
+        reg,
+        units = "hours"
+      )
+    ),
+    pet6 = ifelse(
+      pet < 6,
+      100,
+      0
+    )
+  ) %>% pull(pet6) %>% mean() %>% round(1) %>% paste0("%") -> pet6valuelastmonth
+}
+
+pet6valuelastmonth = paste0(
+  "Prior Month: ",
+  pet6valuelastmonth
+)
+
+edData %>% subset(
+  as.integer(
+    format(
+      depart,
+      "%Y"
+    )
+  ) == Y
+  & as.integer(
+    format(
+      depart,
+      "%m"
+    )
+  ) == M
+) %>% mutate(
+  pet = as.numeric(
+    difftime(
+      depart,
+      reg,
+      units = "hours"
+    )
+  ),
+  pet9 = ifelse(
+    pet < 9,
+    100,
+    0
+  )
+) %>% pull(pet9) %>% mean() %>% round(1) %>% paste0("%") -> pet9value
+
+if(M == 1){
+  edData %>% subset(
+    as.integer(
+      format(
+        depart,
+        "%Y"
+      )
+    ) == Y-1
+    & as.integer(
+      format(
+        depart,
+        "%m"
+      )
+    ) == 12
+  ) %>% mutate(
+    pet = as.numeric(
+      difftime(
+        depart,
+        reg,
+        units = "hours"
+      )
+    ),
+    pet9 = ifelse(
+      pet < 9,
+      100,
+      0
+    )
+  ) %>% pull(pet9) %>% mean() %>% round(1) %>% paste0("%")  -> pet9valuelastmonth
+} else {
+  edData %>% subset(
+    as.integer(
+      format(
+        depart,
+        "%Y"
+      )
+    ) == Y
+    & as.integer(
+      format(
+        depart,
+        "%m"
+      )
+    ) == M-1
+  ) %>% mutate(
+    pet = as.numeric(
+      difftime(
+        depart,
+        reg,
+        units = "hours"
+      )
+    ),
+    pet9 = ifelse(
+      pet < 9,
+      100,
+      0
+    )
+  ) %>% pull(pet9) %>% mean() %>% round(1) %>% paste0("%") -> pet9valuelastmonth
+}
+
+pet9valuelastmonth = paste0(
+  "Prior Month: ",
+  pet9valuelastmonth
+)
+
+edData %>% subset(
+  as.integer(
+    format(
+      depart,
+      "%Y"
+    )
+  ) == Y
+  & as.integer(
+    format(
+      depart,
+      "%m"
+    )
+  ) == M
+) %>% mutate(
+  pet = as.numeric(
+    difftime(
+      depart,
+      reg,
+      units = "hours"
+    )
+  ),
+  pet24 = ifelse(
+    pet >= 24,
+    1,
+    0
+  )
+) %>% pull(pet24) %>% sum() %>% format(big.mark = ",") -> pet24value
+
+edData %>% subset(
+  as.integer(
+    format(
+      depart,
+      "%Y"
+    )
+  ) == Y
+  & as.integer(
+    format(
+      depart,
+      "%m"
+    )
+  ) == M
+) %>% mutate(
+  pet = as.numeric(
+    difftime(
+      depart,
+      reg,
+      units = "hours"
+    )
+  ),
+  petlt24 = ifelse(
+    pet < 24,
+    100,
+    0
+  )
+) %>% pull(petlt24) %>% mean() %>% round(1) %>% paste0("% of ED departures < 24 hours from registration") -> pet24comment
+
+read.csv(
+  file = "C:/Users/jack.lyons/Downloads/TrolleyGAR.csv",
+  stringsAsFactors = FALSE
+) %>% mutate(
+  date = as.Date.character(
+    Target.Date,
+    "%d/%m/%Y"
+  ),
+  year = as.integer(
+    format(
+      date,
+      "%Y"
+    )
+  ),
+  month = as.integer(
+    format(
+      date,
+      "%m"
+    )
+  )
+) %>% subset(
+  year == Y
+  & month == M
+  & !(Hospital.Code %in% c(940, 941, 992))
+) %>% pull(Total.8am) %>% sum() -> monthtrolleys
+
+monthtrolleysvalue = format(
+  monthtrolleys,
+  big.mark = ","
+)
+
+read.csv(
+  file = "C:/Users/jack.lyons/Downloads/TrolleyGAR.csv",
+  stringsAsFactors = FALSE
+) %>% mutate(
+  date = as.Date.character(
+    Target.Date,
+    "%d/%m/%Y"
+  ),
+  year = as.integer(
+    format(
+      date,
+      "%Y"
+    )
+  ),
+  month = as.integer(
+    format(
+      date,
+      "%m"
+    )
+  )
+) %>% subset(
+  year == Y
+  & month <= M
+  & !(Hospital.Code %in% c(940, 941, 992))
+) %>% pull(Total.8am) %>% sum() -> ytdtrolleys
+
+ytdtrolleysvalue = format(
+  ytdtrolleys,
+  big.mark = ","
+)
+
+read.csv(
+  file = "C:/Users/jack.lyons/Downloads/TrolleyGAR.csv",
+  stringsAsFactors = FALSE
+) %>% mutate(
+  date = as.Date.character(
+    Target.Date,
+    "%d/%m/%Y"
+  ),
+  year = as.integer(
+    format(
+      date,
+      "%Y"
+    )
+  ),
+  month = as.integer(
+    format(
+      date,
+      "%m"
+    )
+  )
+) %>% subset(
+  year == Y-1
+  & month == M
+  & !(Hospital.Code %in% c(940, 941, 992))
+) %>% pull(Total.8am) %>% sum() -> monthtrolleyslastyear
+
+(100*(monthtrolleys - monthtrolleyslastyear)/monthtrolleyslastyear) %>% round(1) %>% paste0(
+  "% compared to ",
+  format(
+    as.Date(
+      paste(
+        Y-1,
+        M,
+        1,
+        sep = "-"
+      )
+    ),
+    "%B %Y"
+  )
+) -> monthtrolleyscomment
+
+if(monthtrolleys >= monthtrolleyslastyear){
+  paste0(
+    "+",
+    monthtrolleyscomment
+  ) -> monthtrolleyscomment
+}
+
+read.csv(
+  file = "C:/Users/jack.lyons/Downloads/TrolleyGAR.csv",
+  stringsAsFactors = FALSE
+) %>% subset(
+  as.integer(
+    format(
+      as.Date.character(
+        Target.Date,
+        "%d/%m/%Y"
+      ),
+      "%Y"
+    )
+  ) == Y-1
+  & as.integer(
+    format(
+      as.Date.character(
+        Target.Date,
+        "%d/%m/%Y"
+      ),
+      "%m"
+    )
+  ) <= M
+  & !(Hospital.Code %in% c(940, 941, 992))
+) %>% pull(Total.8am) %>% sum() -> ytdtrolleyslastyear
+
+(100*(ytdtrolleys - ytdtrolleyslastyear)/ytdtrolleyslastyear) %>% round(1) %>% paste0(
+  "% YTD"
+) -> ytdtrolleyscomment
+
+if(ytdtrolleys >= ytdtrolleyslastyear){
+  ytdtrolleyscomment = paste0(
+    "+",
+    ytdtrolleyscomment
+  )
+}
+
+data.frame(
+  KPI = c(
+    "Month Attendances", 
+    "YTD Attendances",
+    "PET < 6 Hours",
+    "PET < 9 Hours",
+    "PET >= 24 Hours",
+    "Trolleys (8:00 am)",
+    "YTD Trolleys (8:00 am)"
+  ),
+  Values = c(
+    monthattendsvalue,
+    ytdattendsvalue,
+    pet6value,
+    pet9value,
+    pet24value,
+    monthtrolleysvalue,
+    ytdtrolleysvalue
+  ),
+  Comment = c(
+    monthattendscomment,
+    ytdattendscomment,
+    pet6valuelastmonth,
+    pet9valuelastmonth,
+    pet24comment,
+    monthtrolleyscomment,
+    ytdtrolleyscomment
+  )
+) %>% plot_ly() %>% add_table(
+  rownames = FALSE,
+  columnwidth = c(1, 1, 2),
+  header = list(
+    height = 40,
+    align = c(
+      "left",
+      "left",
+      "left"
+    ),
+    line = list(
+      width = 0
+    ),
+    fill = list(
+      color = "skyblue"
+    )
+  ),
+  cells = list(
+    height = 40,
+    align = c(
+      "left",
+      "left",
+      "left"
+    ),
+    line = list(
+      width = 0
+    )
+  )
+) %>% layout(
+  font = list(
+    family = "Trebuchet MS",
+    size = 25,
+    color = "grey31"
+  ),
+  margin = list(t = 5, b = 5, l = 5, r = 5),
+  autosize = FALSE,
+  width = 1300,
+  height = 975
+) %>% export(
+  file = "summary.png"
+)
+```
+
+# ED Attendances
+
+## ED Attendances Trend (Bar)
+
+```{r edAttendsBar}
+edData %>% 
+  mutate(regmonthnumber = as.integer(format(reg, "%m")), 
+         regyear = as.integer(format(reg, "%Y")), 
+         regmonth = format(reg, "%B"), 
+         count = 1) %>% 
+  group_by(regyear, regmonthnumber) %>% 
+  mutate(count = sum(count)) %>%
+  ungroup() %>%
+  select(regmonthnumber, regmonth, regyear, count) %>% 
+  distinct() %>% mutate(maxyear = max(regyear), regyear = ifelse(regyear==max(regyear), "Y1", "Y0")) %>% spread(regyear, count) %>% mutate(Y1 = ifelse(is.na(Y1), 0, Y1)) %>% melt(c("regmonth", "regmonthnumber", "maxyear")) %>% rename(count = value, regyear=variable) %>% mutate(regyear = ifelse(regyear == "Y1", maxyear, maxyear-1)) -> D
+
+D %>% ggplot(aes(x = reorder(regmonth, regmonthnumber), y = count, fill = factor(regyear))) + 
+  
+  geom_bar(stat = "identity", position = "dodge") +
+  
+  geom_text(color = "white", size = txt_sz, aes(x = regmonth, y = count, label = ifelse(count ==0, "", format(count, big.mark = ",")), family = "Trebuchet MS"), 
+            
+            angle = 90,
+            
+            vjust = ifelse(D$regyear == max(D$regyear), 2, -1),
+            
+            hjust = 1
+            
+            ) +
+  
+  labs(title = "ED Attendances") + 
+  
+  scale_fill_manual(values = c(red, blue)) +
+  
+  scale_y_continuous(limits = c(0, 1.1*max(D$count))) +
+  
+  theme(panel.background = x, legend.title = x, text = f1, axis.line = x, legend.position = "top", axis.title = x, axis.text.x = rotated_f1, axis.text.y = x, plot.title = title_style) + 
+  
+  guides(fill = guide_legend(override.aes = list(size = 30)))
+```
+
+## ED Attendances Age Profile Trend
+
+```{r agetrend}
+edData %>% mutate(
+  agegroup = ifelse(
+    is.na(age) | age < 0 | age >= 110,
+    "Unknown",
+    ifelse(
+      age < 16,
+      "Paediatrics: 0-15",
+      ifelse(
+        age >= 16 & age < 75,
+        "Adults: 16-74",
+        "Adults: 75+"
+      )
+    )
+  ),
+  count = 1,
+  month = as.Date(
+    format(
+      reg,
+      "%Y-%m-01"
+    )
+  )
+) %>% group_by(
+  month,
+  agegroup
+) %>% mutate(
+  count = sum(count)
+) %>% ungroup() %>% select(
+  month, 
+  agegroup,
+  count
+) %>% distinct() %>% arrange(
+  month
+) -> D
+
+D %>% ggplot(aes(x = month, y = count)) + 
+  
+  geom_line(aes(color = agegroup), size = line_sz) + geom_point(aes(color = agegroup), key_glyph = "rect", size = pnt_sz) +
+  
+  geom_text(color = "grey31", size = txt_sz, aes(x = month, y = count, label = format(count, big.mark = ","), family = "Trebuchet MS", vjust = "top")) +
+  
+  labs(title = "ED Attendances") + 
+  
+  scale_color_manual(values = c(red, green, blue, orange)) +
+  
+  scale_x_date(breaks = D$month, labels = format(D$month, "%B %Y")) +
+  
+  theme(panel.background = x, legend.title = x, text = f1, axis.line = element_line(color = "grey31", size = 2), legend.position = "top", legend.key = x, axis.title = x, axis.text.x = rotated_f1, panel.grid.major = grid_line) + legendFixColor
+```
+
+## ED Attendances Age Profile Trend (% of Total)
+
+```{r agepctrend}
+edData %>% mutate(
+  agegroup = ifelse(
+    is.na(age) | age < 0 | age >= 110,
+    "Unknown",
+    ifelse(
+      age < 16,
+      "Paediatrics: 0-15",
+      ifelse(
+        age >= 16 & age < 75,
+        "Adults: 16-74",
+        "Adults: 75+"
+      )
+    )
+  ),
+  count = 1,
+  month = as.Date(
+    format(
+      reg,
+      "%Y-%m-01"
+    )
+  )
+) %>% group_by(
+  month
+) %>% mutate(monthcount = sum(count)) %>% group_by(
+  month,
+  agegroup
+) %>% mutate(
+  count = sum(count)
+) %>% ungroup() %>% select(
+  month, 
+  agegroup,
+  count,
+  monthcount
+) %>% distinct() %>% arrange(
+  month
+) %>% mutate(
+  value = count/monthcount,
+  label = paste0(
+    round(
+      100*value,
+      1
+    ),
+    "%"
+  )
+) -> D
+
+D %>% ggplot(aes(x = month, y = value)) + 
+  
+  geom_line(aes(color = agegroup), size = line_sz) + geom_point(aes(color = agegroup), size = pnt_sz, key_glyph = "rect") +
+  
+  geom_text(color = "grey31", size = txt_sz, aes(x = month, y = value, label = label, family = "Trebuchet MS"), vjust = "top") +
+  
+  labs(title = "Portion of Total ED Attendances") + 
+  
+  scale_y_continuous(breaks = seq(0, 0.8, by = 0.1), labels = paste0(round(100*seq(0, 0.8, by = 0.1)), "%")) +
+  
+  scale_x_date(breaks = D$month, labels = format(D$month, "%B %Y")) +
+  
+  scale_color_manual(values = c(red, green, blue, orange)) +
+  
+  theme(panel.background = x, legend.title = x, text = f1, axis.line = element_line(color = "grey31", size = 1), legend.position = "top", legend.key = x, axis.title = x, axis.text.x = rotated_f1, panel.grid.major = grid_line) + legendFixColor
+```
+
+```{r edAttendsScatter, eval = FALSE}
+edAttendsLastYear = edData %>% 
+  mutate(monthNumber = as.integer(format(reg, "%m")), 
+         year = as.integer(format(reg, "%Y")), 
+         month = format(as.Date(paste(year, monthNumber, 1, sep = "-")), "%B"), 
+         count = 1) %>% 
+  subset(year == max(year)-1) %>%
+  group_by(monthNumber) %>% 
+  mutate(lastYearsCount = sum(count)) %>% 
+  select(monthNumber, month, year, lastYearsCount) %>% 
+  distinct()
+
+edAttendsPresentYear = edData %>% 
+  mutate(monthNumber = as.integer(format(reg, "%m")), 
+         year = as.integer(format(reg, "%Y")), 
+         month = format(as.Date(paste(year, monthNumber, 1, sep = "-")), "%B"), 
+         count = 1) %>% 
+  subset(year == max(year)) %>%
+  group_by(monthNumber) %>% 
+  mutate(thisYearsCount = sum(count)) %>% 
+  select(monthNumber, month, year, thisYearsCount) %>% 
+  distinct()
+
+edAttendsByMonth = merge(x = edAttendsLastYear %>% select(monthNumber, month, lastYearsCount), 
+      y = edAttendsPresentYear %>% select(monthNumber, month, thisYearsCount),
+      by = c("monthNumber", "month"),
+      all = TRUE) %>% 
+  mutate(presentYear = max(edAttendsPresentYear$year))
+
+future = edAttendsByMonth %>% subset(is.na(thisYearsCount)) %>% select(monthNumber, presentYear) %>% mutate(month = format(as.Date(paste(presentYear, monthNumber, 1, sep = "-")), "%B"))
+pd = lm(lastYearsCount~monthNumber, data = edAttendsByMonth) %>% predict(future, interval = "predict") %>% data.frame() %>% cbind(future) %>% merge(y = edAttendsByMonth, by = c("monthNumber", "month", "presentYear"), all = TRUE) %>% arrange(monthNumber)
+
+pd %>% plot_ly(x = ~monthNumber) %>% 
+  add_markers(y = ~lastYearsCount, name = "2019 Data", size = 3) %>%
+  add_markers(y = ~thisYearsCount, name = "2020 Data", size = 3) %>%
+  add_lines(y = ~upr, name = "95% Prediction Interval", line = list(dash = "dash", color = "lightblue")) %>%
+  add_lines(y = ~lwr, name = "Lower Prediction", showlegend = FALSE, line = list(dash = "dash", color = "lightblue")) %>%
+  layout(xaxis = list(tickvals = ~monthNumber, ticktext = ~month, title = "", tickangle = 90), 
+         yaxis = list(title = "Attendances"), 
+         font = list(family = "Trebuchet MS", size = 18, color = "grey31"),
+         legend = list(orientation = "h", x = 0, y = 1.1),
+         autosize = FALSE, width = 1300, height = 975,
+         margin = list(r = 5, l = 5, b = 5, t = 5)) %>%
+  export(file = "edAttendsScatter.png")
+```
+
+## ED Attendances Age Profile
+
+```{r edAttendsAgePie, eval = FALSE}
+edData %>% mutate(month = as.Date(format(reg, "%Y-%m-01"))) %>% 
+  subset(month == max(month)) %>% 
+  mutate(ageGroup = ifelse(is.na(age) | age < 0 | age >= 110, "Unknown", 
+                           ifelse(age < 16, "Paediatrics: 0-15", 
+                                  ifelse(age >= 16 & age < 75, "Adults: 16-74", 
+                                         "Adults: 75+"))),
+         count = 1) %>%
+  group_by(ageGroup) %>%
+  mutate(count = sum(count)) %>%
+  select(ageGroup, count) %>%
+  distinct() %>%
+  
+  arrange(ageGroup) %>%
+  
+  plot_ly() %>%
+  add_pie(values = ~count, labels = ~ageGroup, textinfo = "label+value+percent", showlegend = FALSE, marker = list(colors = c(red, green, blue, orange))) %>%
+  layout(font = list(family = "Trebuchet MS", size = 100, color = "grey31"),
+         #autosize = FALSE, width = 1300, height = 975,
+         margin = list(r = 5, l = 5, t = 5, b = 5))
+```
+
+```{r edAttendsAgePie2}
+edData %>% mutate(month = as.Date(format(reg, "%Y-%m-01"))) %>% 
+  subset(month == max(month)) %>% 
+  mutate(ageGroup = ifelse(is.na(age) | age < 0 | age >= 110, "Unknown", 
+                           ifelse(age < 16, "Paediatrics: 0-15", 
+                                  ifelse(age >= 16 & age < 75, "Adults: 16-74", 
+                                         "Adults: 75+"))),
+         count = 1) %>%
+  group_by(ageGroup) %>%
+  mutate(count = sum(count)) %>%
+  
+  ungroup() %>%
+  
+  distinct(month, ageGroup, count) %>%
+  
+  arrange(desc(ageGroup)) %>%
+  
+  mutate(portion = 100*count/sum(count), ypos = ifelse(ageGroup == "Unknown", 90, cumsum(portion) - 0.5*portion), lbl = paste0(round(portion, 1), "%")) -> D
+
+D %>% pull(month) %>% unique() %>% format("%B %Y") -> sbttl
+
+D %>% ggplot(aes(x = "", fill = ageGroup)) + geom_bar(aes(y = portion), stat = "identity") + coord_polar(theta = "y", direction = -1, start = 0) + scale_fill_manual(values = c(red, green, blue, orange)) + theme(panel.background = x, legend.title = x, legend.text = f1, legend.position = "bottom", legend.direction = "horizontal", axis.title = x, axis.ticks = x, axis.text = x) + geom_text(color = "grey31", aes(y = ypos, label = paste(ageGroup, format(count, big.mark = ","), lbl, sep = "\n")), family = "Trebuchet MS", size = txt_sz*1.2) + legendFixFill + labs(title = "ED Attendances Age Profile", subtitle = sbttl) + theme(plot.title = title_style, plot.subtitle = subtitle_style)
+```
+
+## ED Attendances Month & YTD
+
+```{r edTable, eval=FALSE}
+edAttendsByHosp = edData %>% mutate(month = as.integer(format(reg, "%m")), 
+                                    year = as.integer(format(reg, "%Y")),
+                                    lastYearsCount = ifelse(year == max(year)-1, 1, 0),
+                                    thisYearsCount = ifelse(year == max(year), 1, 0)) %>% 
+  subset(year >= max(year)-1) %>% 
+  merge(y = read.csv(file = "~/provider_codes.csv", stringsAsFactors = FALSE) %>%
+          select(biu_hospital_id, hospital_group_long_name, hospital),
+        by = "biu_hospital_id", all = FALSE) %>%
+  group_by(month, hospital) %>%
+  mutate(lastYearsCount = sum(lastYearsCount),
+         thisYearsCount = sum(thisYearsCount)) %>%
+  ungroup() %>%
+  mutate(presentYear = max(year)) %>%
+  select(hospital_group_long_name, hospital, month, presentYear, lastYearsCount, thisYearsCount) %>%
+  distinct() %>% arrange(hospital_group_long_name, hospital, month) %>%
+  group_by(hospital) %>% 
+  mutate(ytdLastYearsCount = cumsum(lastYearsCount),
+         ytdThisYearsCount = cumsum(thisYearsCount)) %>%
+  ungroup() %>% 
+  subset(thisYearsCount != 0 & complete.cases(thisYearsCount)) %>% 
+  subset(month == max(month)) %>%
+  select(presentYear, month, hospital_group_long_name, hospital, lastYearsCount, thisYearsCount, ytdLastYearsCount, ytdThisYearsCount) %>%
+  mutate(change = ifelse(complete.cases(lastYearsCount) & lastYearsCount != 0,
+                         ifelse(lastYearsCount > thisYearsCount,
+                                paste0(round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%"),
+                                paste0("+", round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%")),
+                         ""),
+         ytdChange = ifelse(complete.cases(ytdLastYearsCount) & ytdLastYearsCount != 0,
+                            ifelse(ytdLastYearsCount > ytdThisYearsCount,
+                                   paste0(round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%"),
+                                   paste0("+", round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%")),
+                            "")) %>% 
+  subset(complete.cases(hospital)) %>%
+  data.frame() %>%
+  mutate(gap1 = "", gap2 = "")
+
+
+MMMM = format(as.Date(paste(max(edAttendsByHosp$presentYear)-1,
+                            max(edAttendsByHosp$month),
+                            1, sep = "-")), "%B")
+
+YYYY1 = max(edAttendsByHosp$presentYear)
+YYYY0 = YYYY1 - 1
+
+totalRow = data.frame(lastYearsCount = sum(edAttendsByHosp$lastYearsCount),
+                      thisYearsCount = sum(edAttendsByHosp$thisYearsCount),
+                      gap1 = "",
+                      ytdLastYearsCount = sum(edAttendsByHosp$ytdLastYearsCount),
+                      ytdThisYearsCount = sum(edAttendsByHosp$ytdThisYearsCount),
+                      gap2 = "",
+                      hospital_group_long_name = "Total",
+                      hospital = "")
+
+totalRow$change = ifelse(totalRow$lastYearsCount > totalRow$thisYearsCount,
+                         paste0(round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"),
+                         paste0("+", round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"))
+
+totalRow$ytdChange = ifelse(totalRow$ytdLastYearsCount > totalRow$ytdThisYearsCount,
+                            paste0(round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"),
+                            paste0("+", round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"))
+
+rbind(
+  edAttendsByHosp %>%
+    select(
+      hospital_group_long_name,
+      hospital,
+      thisYearsCount, 
+      ytdThisYearsCount,
+      gap1,
+      lastYearsCount,
+      ytdLastYearsCount,
+      gap2, 
+      change, 
+      ytdChange
+    ),
+  totalRow
+) %>% mutate(
+  hospital_group_long_name = ifelse(
+    duplicated(hospital_group_long_name),
+    "",
+    hospital_group_long_name
+  )
+) -> edAttendsByHosp
+
+for(c in c("lastYearsCount", "thisYearsCount", "ytdLastYearsCount", "ytdThisYearsCount")){
+  edAttendsByHosp[, c] = format(edAttendsByHosp[, c], big.mark = ",")
+}
+
+edAttendsByHosp %>% plot_ly() %>% add_table(
+  rownames = FALSE,
+  columnwidth = c(4, 2, rep(1, 8)),
+  header = list(
+    values = c(
+      "",
+      "", 
+      paste(MMMM, YYYY0, sep = "<br>"),
+      paste0(MMMM, "<br>", YYYY0, " YTD"),
+      "",
+      paste(MMMM, YYYY1, sep = "<br>"), 
+      paste0(MMMM, "<br>", YYYY1, " YTD"), 
+      "", 
+      "% Change<br>Month", 
+      "% Change<br>YTD"
+    ),
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = c(
+        "skyblue", "skyblue", "skyblue", "skyblue", 
+        "white", 
+        "skyblue", "skyblue", 
+        "white",  
+        "skyblue", "skyblue"
+      )
+    )
+  ),
+  cells = list(
+    height = 25,
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = list(
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue")
+      )
+    )
+  )
+) %>%
+  layout(
+    font = list(
+      family = "Trebuchet MS",
+      size = 16,
+      color = "grey31"
+    ),
+    autosize = FALSE,
+    width = 1300,
+    height = 975,
+    margin = list(t = 5, b = 5, r = 5, l = 5)
+  ) %>%
+  export(file = "edAttendsTable.png")
+```
+
+## ED Attendances (Ages: 0-15) Month & YTD
+
+```{r edTable015, eval=FALSE}
+edAttendsByHosp = edData %>% mutate(month = as.integer(format(reg, "%m")), 
+                                    year = as.integer(format(reg, "%Y")),
+                                    lastYearsCount = ifelse(year == max(year)-1, 1, 0),
+                                    thisYearsCount = ifelse(year == max(year), 1, 0)) %>% 
+  subset(
+    year >= max(year)-1
+    & complete.cases(age)
+    & age >= 0
+    & age < 16
+  ) %>% 
+  merge(y = read.csv(file = "~/provider_codes.csv", stringsAsFactors = FALSE) %>%
+          select(biu_hospital_id, hospital_group_long_name, hospital),
+        by = "biu_hospital_id", all = FALSE) %>%
+  group_by(month, hospital) %>%
+  mutate(lastYearsCount = sum(lastYearsCount),
+         thisYearsCount = sum(thisYearsCount)) %>%
+  ungroup() %>%
+  mutate(presentYear = max(year)) %>%
+  select(hospital_group_long_name, hospital, month, presentYear, lastYearsCount, thisYearsCount) %>%
+  distinct() %>% arrange(hospital_group_long_name, hospital, month) %>%
+  group_by(hospital) %>% 
+  mutate(ytdLastYearsCount = cumsum(lastYearsCount),
+         ytdThisYearsCount = cumsum(thisYearsCount)) %>%
+  ungroup() %>% 
+  subset(thisYearsCount != 0 & complete.cases(thisYearsCount)) %>% 
+  subset(month == max(month)) %>%
+  select(presentYear, month, hospital_group_long_name, hospital, lastYearsCount, thisYearsCount, ytdLastYearsCount, ytdThisYearsCount) %>%
+  mutate(change = ifelse(complete.cases(lastYearsCount) & lastYearsCount != 0,
+                         ifelse(lastYearsCount > thisYearsCount,
+                                paste0(round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%"),
+                                paste0("+", round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%")),
+                         ""),
+         ytdChange = ifelse(complete.cases(ytdLastYearsCount) & ytdLastYearsCount != 0,
+                            ifelse(ytdLastYearsCount > ytdThisYearsCount,
+                                   paste0(round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%"),
+                                   paste0("+", round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%")),
+                            "")) %>% 
+  subset(complete.cases(hospital)) %>%
+  data.frame() %>%
+  mutate(gap1 = "", gap2 = "")
+
+
+MMMM = format(as.Date(paste(max(edAttendsByHosp$presentYear)-1,
+                            max(edAttendsByHosp$month),
+                            1, sep = "-")), "%B")
+
+YYYY1 = max(edAttendsByHosp$presentYear)
+YYYY0 = YYYY1 - 1
+
+totalRow = data.frame(lastYearsCount = sum(edAttendsByHosp$lastYearsCount),
+                      thisYearsCount = sum(edAttendsByHosp$thisYearsCount),
+                      gap1 = "",
+                      ytdLastYearsCount = sum(edAttendsByHosp$ytdLastYearsCount),
+                      ytdThisYearsCount = sum(edAttendsByHosp$ytdThisYearsCount),
+                      gap2 = "",
+                      hospital_group_long_name = "Total",
+                      hospital = "")
+
+totalRow$change = ifelse(totalRow$lastYearsCount > totalRow$thisYearsCount,
+                         paste0(round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"),
+                         paste0("+", round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"))
+
+totalRow$ytdChange = ifelse(totalRow$ytdLastYearsCount > totalRow$ytdThisYearsCount,
+                            paste0(round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"),
+                            paste0("+", round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"))
+
+rbind(
+  edAttendsByHosp %>%
+    select(
+      hospital_group_long_name,
+      hospital,
+      thisYearsCount, 
+      ytdThisYearsCount,
+      gap1,
+      lastYearsCount,
+      ytdLastYearsCount,
+      gap2, 
+      change, 
+      ytdChange
+    ),
+  totalRow
+) %>% mutate(
+  hospital_group_long_name = ifelse(
+    duplicated(hospital_group_long_name),
+    "",
+    hospital_group_long_name
+  )
+) -> edAttendsByHosp
+
+for(c in c("lastYearsCount", "thisYearsCount", "ytdLastYearsCount", "ytdThisYearsCount")){
+  edAttendsByHosp[, c] = format(edAttendsByHosp[, c], big.mark = ",")
+}
+
+edAttendsByHosp %>% plot_ly() %>% add_table(
+  rownames = FALSE,
+  columnwidth = c(4, 2, rep(1, 8)),
+  header = list(
+    values = c(
+      "",
+      "", 
+      paste(MMMM, YYYY0, sep = "<br>"),
+      paste0(MMMM, "<br>", YYYY0, " YTD"),
+      "",
+      paste(MMMM, YYYY1, sep = "<br>"), 
+      paste0(MMMM, "<br>", YYYY1, " YTD"), 
+      "", 
+      "% Change<br>Month", 
+      "% Change<br>YTD"
+    ),
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = c(
+        "skyblue", "skyblue", "skyblue", "skyblue", 
+        "white", 
+        "skyblue", "skyblue", 
+        "white",  
+        "skyblue", "skyblue"
+      )
+    )
+  ),
+  cells = list(
+    height = 25,
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = list(
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue")
+      )
+    )
+  )
+) %>%
+  layout(
+    font = list(
+      family = "Trebuchet MS",
+      size = 16,
+      color = "grey31"
+    ),
+    autosize = FALSE,
+    width = 1300,
+    height = 975,
+    margin = list(t = 5, b = 5, r = 5, l = 5)
+  ) %>%
+  export(file = "edAttendsTable015.png")
+```
+
+## ED Attendances (Ages: 16-74) Month & YTD
+
+```{r edTable1674, eval=FALSE}
+edAttendsByHosp = edData %>% mutate(month = as.integer(format(reg, "%m")), 
+                                    year = as.integer(format(reg, "%Y")),
+                                    lastYearsCount = ifelse(year == max(year)-1, 1, 0),
+                                    thisYearsCount = ifelse(year == max(year), 1, 0)) %>% 
+  subset(
+    year >= max(year)-1
+    & complete.cases(age)
+    & age >= 16
+    & age < 75
+  ) %>% 
+  merge(y = read.csv(file = "~/provider_codes.csv", stringsAsFactors = FALSE) %>%
+          select(biu_hospital_id, hospital_group_long_name, hospital),
+        by = "biu_hospital_id", all = FALSE) %>%
+  group_by(month, hospital) %>%
+  mutate(lastYearsCount = sum(lastYearsCount),
+         thisYearsCount = sum(thisYearsCount)) %>%
+  ungroup() %>%
+  mutate(presentYear = max(year)) %>%
+  select(hospital_group_long_name, hospital, month, presentYear, lastYearsCount, thisYearsCount) %>%
+  distinct() %>% arrange(hospital_group_long_name, hospital, month) %>%
+  group_by(hospital) %>% 
+  mutate(ytdLastYearsCount = cumsum(lastYearsCount),
+         ytdThisYearsCount = cumsum(thisYearsCount)) %>%
+  ungroup() %>% 
+  subset(thisYearsCount != 0 & complete.cases(thisYearsCount)) %>% 
+  subset(month == max(month)) %>%
+  select(presentYear, month, hospital_group_long_name, hospital, lastYearsCount, thisYearsCount, ytdLastYearsCount, ytdThisYearsCount) %>%
+  mutate(change = ifelse(complete.cases(lastYearsCount) & lastYearsCount != 0,
+                         ifelse(lastYearsCount > thisYearsCount,
+                                paste0(round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%"),
+                                paste0("+", round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%")),
+                         ""),
+         ytdChange = ifelse(complete.cases(ytdLastYearsCount) & ytdLastYearsCount != 0,
+                            ifelse(ytdLastYearsCount > ytdThisYearsCount,
+                                   paste0(round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%"),
+                                   paste0("+", round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%")),
+                            "")) %>% 
+  subset(complete.cases(hospital)) %>%
+  data.frame() %>%
+  mutate(gap1 = "", gap2 = "")
+
+
+MMMM = format(as.Date(paste(max(edAttendsByHosp$presentYear)-1,
+                            max(edAttendsByHosp$month),
+                            1, sep = "-")), "%B")
+
+YYYY1 = max(edAttendsByHosp$presentYear)
+YYYY0 = YYYY1 - 1
+
+totalRow = data.frame(lastYearsCount = sum(edAttendsByHosp$lastYearsCount),
+                      thisYearsCount = sum(edAttendsByHosp$thisYearsCount),
+                      gap1 = "",
+                      ytdLastYearsCount = sum(edAttendsByHosp$ytdLastYearsCount),
+                      ytdThisYearsCount = sum(edAttendsByHosp$ytdThisYearsCount),
+                      gap2 = "",
+                      hospital_group_long_name = "Total",
+                      hospital = "")
+
+totalRow$change = ifelse(totalRow$lastYearsCount > totalRow$thisYearsCount,
+                         paste0(round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"),
+                         paste0("+", round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"))
+
+totalRow$ytdChange = ifelse(totalRow$ytdLastYearsCount > totalRow$ytdThisYearsCount,
+                            paste0(round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"),
+                            paste0("+", round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"))
+
+rbind(
+  edAttendsByHosp %>%
+    select(
+      hospital_group_long_name,
+      hospital,
+      thisYearsCount, 
+      ytdThisYearsCount,
+      gap1,
+      lastYearsCount,
+      ytdLastYearsCount,
+      gap2, 
+      change, 
+      ytdChange
+    ),
+  totalRow
+) %>% mutate(
+  hospital_group_long_name = ifelse(
+    duplicated(hospital_group_long_name),
+    "",
+    hospital_group_long_name
+  )
+) -> edAttendsByHosp
+
+for(c in c("lastYearsCount", "thisYearsCount", "ytdLastYearsCount", "ytdThisYearsCount")){
+  edAttendsByHosp[, c] = format(edAttendsByHosp[, c], big.mark = ",")
+}
+
+edAttendsByHosp %>% plot_ly() %>% add_table(
+  rownames = FALSE,
+  columnwidth = c(4, 2, rep(1, 8)),
+  header = list(
+    values = c(
+      "",
+      "", 
+      paste(MMMM, YYYY0, sep = "<br>"),
+      paste0(MMMM, "<br>", YYYY0, " YTD"),
+      "",
+      paste(MMMM, YYYY1, sep = "<br>"), 
+      paste0(MMMM, "<br>", YYYY1, " YTD"), 
+      "", 
+      "% Change<br>Month", 
+      "% Change<br>YTD"
+    ),
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = c(
+        "skyblue", "skyblue", "skyblue", "skyblue", 
+        "white", 
+        "skyblue", "skyblue", 
+        "white",  
+        "skyblue", "skyblue"
+      )
+    )
+  ),
+  cells = list(
+    height = 25,
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = list(
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue")
+      )
+    )
+  )
+) %>%
+  layout(
+    font = list(
+      family = "Trebuchet MS",
+      size = 16,
+      color = "grey31"
+    ),
+    autosize = FALSE,
+    width = 1300,
+    height = 975,
+    margin = list(t = 5, b = 5, r = 5, l = 5)
+  ) %>%
+  export(file = "edAttendsTable1674.png")
+```
+
+## ED Attendances (Ages: 75+) Month & YTD
+
+```{r edTable75, eval=FALSE}
+edAttendsByHosp = edData %>% mutate(month = as.integer(format(reg, "%m")), 
+                                    year = as.integer(format(reg, "%Y")),
+                                    lastYearsCount = ifelse(year == max(year)-1, 1, 0),
+                                    thisYearsCount = ifelse(year == max(year), 1, 0)) %>% 
+  subset(
+    year >= max(year)-1
+    & complete.cases(age)
+    & age >= 75
+    & age < 110
+  ) %>% 
+  merge(y = read.csv(file = "~/provider_codes.csv", stringsAsFactors = FALSE) %>%
+          select(biu_hospital_id, hospital_group_long_name, hospital),
+        by = "biu_hospital_id", all = FALSE) %>%
+  group_by(month, hospital) %>%
+  mutate(lastYearsCount = sum(lastYearsCount),
+         thisYearsCount = sum(thisYearsCount)) %>%
+  ungroup() %>%
+  mutate(presentYear = max(year)) %>%
+  select(hospital_group_long_name, hospital, month, presentYear, lastYearsCount, thisYearsCount) %>%
+  distinct() %>% arrange(hospital_group_long_name, hospital, month) %>%
+  group_by(hospital) %>% 
+  mutate(ytdLastYearsCount = cumsum(lastYearsCount),
+         ytdThisYearsCount = cumsum(thisYearsCount)) %>%
+  ungroup() %>% 
+  subset(thisYearsCount != 0 & complete.cases(thisYearsCount)) %>% 
+  subset(month == max(month)) %>%
+  select(presentYear, month, hospital_group_long_name, hospital, lastYearsCount, thisYearsCount, ytdLastYearsCount, ytdThisYearsCount) %>%
+  mutate(change = ifelse(complete.cases(lastYearsCount) & lastYearsCount != 0,
+                         ifelse(lastYearsCount > thisYearsCount,
+                                paste0(round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%"),
+                                paste0("+", round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%")),
+                         ""),
+         ytdChange = ifelse(complete.cases(ytdLastYearsCount) & ytdLastYearsCount != 0,
+                            ifelse(ytdLastYearsCount > ytdThisYearsCount,
+                                   paste0(round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%"),
+                                   paste0("+", round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%")),
+                            "")) %>% 
+  subset(complete.cases(hospital)) %>%
+  data.frame() %>%
+  mutate(gap1 = "", gap2 = "")
+
+
+MMMM = format(as.Date(paste(max(edAttendsByHosp$presentYear)-1,
+                            max(edAttendsByHosp$month),
+                            1, sep = "-")), "%B")
+
+YYYY1 = max(edAttendsByHosp$presentYear)
+YYYY0 = YYYY1 - 1
+
+totalRow = data.frame(lastYearsCount = sum(edAttendsByHosp$lastYearsCount),
+                      thisYearsCount = sum(edAttendsByHosp$thisYearsCount),
+                      gap1 = "",
+                      ytdLastYearsCount = sum(edAttendsByHosp$ytdLastYearsCount),
+                      ytdThisYearsCount = sum(edAttendsByHosp$ytdThisYearsCount),
+                      gap2 = "",
+                      hospital_group_long_name = "Total",
+                      hospital = "")
+
+totalRow$change = ifelse(totalRow$lastYearsCount > totalRow$thisYearsCount,
+                         paste0(round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"),
+                         paste0("+", round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"))
+
+totalRow$ytdChange = ifelse(totalRow$ytdLastYearsCount > totalRow$ytdThisYearsCount,
+                            paste0(round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"),
+                            paste0("+", round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"))
+
+rbind(
+  edAttendsByHosp %>%
+    select(
+      hospital_group_long_name,
+      hospital,
+      thisYearsCount, 
+      ytdThisYearsCount,
+      gap1,
+      lastYearsCount,
+      ytdLastYearsCount,
+      gap2, 
+      change, 
+      ytdChange
+    ),
+  totalRow
+) %>% mutate(
+  hospital_group_long_name = ifelse(
+    duplicated(hospital_group_long_name),
+    "",
+    hospital_group_long_name
+  )
+) -> edAttendsByHosp
+
+for(c in c("lastYearsCount", "thisYearsCount", "ytdLastYearsCount", "ytdThisYearsCount")){
+  edAttendsByHosp[, c] = format(edAttendsByHosp[, c], big.mark = ",")
+}
+
+edAttendsByHosp %>% plot_ly() %>% add_table(
+  rownames = FALSE,
+  columnwidth = c(4, 2, rep(1, 8)),
+  header = list(
+    values = c(
+      "",
+      "", 
+      paste(MMMM, YYYY0, sep = "<br>"),
+      paste0(MMMM, "<br>", YYYY0, " YTD"),
+      "",
+      paste(MMMM, YYYY1, sep = "<br>"), 
+      paste0(MMMM, "<br>", YYYY1, " YTD"), 
+      "", 
+      "% Change<br>Month", 
+      "% Change<br>YTD"
+    ),
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = c(
+        "skyblue", "skyblue", "skyblue", "skyblue", 
+        "white", 
+        "skyblue", "skyblue", 
+        "white",  
+        "skyblue", "skyblue"
+      )
+    )
+  ),
+  cells = list(
+    height = 25,
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = list(
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue")
+      )
+    )
+  )
+) %>%
+  layout(
+    font = list(
+      family = "Trebuchet MS",
+      size = 16,
+      color = "grey31"
+    ),
+    autosize = FALSE,
+    width = 1300,
+    height = 975,
+    margin = list(t = 5, b = 5, r = 5, l = 5)
+  ) %>%
+  export(file = "edAttendsTable75.png")
+
+```
+
+## ED Attendances (Ages: Unknown) Month & YTD
+
+```{r edTableUnknown, eval=FALSE}
+edAttendsByHosp = edData %>% mutate(month = as.integer(format(reg, "%m")), 
+                                    year = as.integer(format(reg, "%Y")),
+                                    lastYearsCount = ifelse(year == max(year)-1, 1, 0),
+                                    thisYearsCount = ifelse(year == max(year), 1, 0)) %>% 
+  subset(
+    year >= max(year)-1
+    & (is.na(age)
+    | age >= 110
+    | age < 0)
+  ) %>% 
+  merge(y = read.csv(file = "~/provider_codes.csv", stringsAsFactors = FALSE) %>%
+          select(biu_hospital_id, hospital_group_long_name, hospital),
+        by = "biu_hospital_id", all = FALSE) %>%
+  group_by(month, hospital) %>%
+  mutate(lastYearsCount = sum(lastYearsCount),
+         thisYearsCount = sum(thisYearsCount)) %>%
+  ungroup() %>%
+  mutate(presentYear = max(year)) %>%
+  select(hospital_group_long_name, hospital, month, presentYear, lastYearsCount, thisYearsCount) %>%
+  distinct() %>% arrange(hospital_group_long_name, hospital, month) %>%
+  group_by(hospital) %>% 
+  mutate(ytdLastYearsCount = cumsum(lastYearsCount),
+         ytdThisYearsCount = cumsum(thisYearsCount)) %>%
+  ungroup() %>% 
+  subset(thisYearsCount != 0 & complete.cases(thisYearsCount)) %>% 
+  subset(month == max(month)) %>%
+  select(presentYear, month, hospital_group_long_name, hospital, lastYearsCount, thisYearsCount, ytdLastYearsCount, ytdThisYearsCount) %>%
+  mutate(change = ifelse(complete.cases(lastYearsCount) & lastYearsCount != 0,
+                         ifelse(lastYearsCount > thisYearsCount,
+                                paste0(round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%"),
+                                paste0("+", round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%")),
+                         ""),
+         ytdChange = ifelse(complete.cases(ytdLastYearsCount) & ytdLastYearsCount != 0,
+                            ifelse(ytdLastYearsCount > ytdThisYearsCount,
+                                   paste0(round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%"),
+                                   paste0("+", round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%")),
+                            "")) %>% 
+  subset(complete.cases(hospital)) %>%
+  data.frame() %>%
+  mutate(gap1 = "", gap2 = "")
+
+
+MMMM = format(as.Date(paste(max(edAttendsByHosp$presentYear)-1,
+                            max(edAttendsByHosp$month),
+                            1, sep = "-")), "%B")
+
+YYYY1 = max(edAttendsByHosp$presentYear)
+YYYY0 = YYYY1 - 1
+
+totalRow = data.frame(lastYearsCount = sum(edAttendsByHosp$lastYearsCount),
+                      thisYearsCount = sum(edAttendsByHosp$thisYearsCount),
+                      gap1 = "",
+                      ytdLastYearsCount = sum(edAttendsByHosp$ytdLastYearsCount),
+                      ytdThisYearsCount = sum(edAttendsByHosp$ytdThisYearsCount),
+                      gap2 = "",
+                      hospital_group_long_name = "Total",
+                      hospital = "")
+
+totalRow$change = ifelse(totalRow$lastYearsCount > totalRow$thisYearsCount,
+                         paste0(round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"),
+                         paste0("+", round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"))
+
+totalRow$ytdChange = ifelse(totalRow$ytdLastYearsCount > totalRow$ytdThisYearsCount,
+                            paste0(round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"),
+                            paste0("+", round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"))
+
+rbind(
+  edAttendsByHosp %>%
+    select(
+      hospital_group_long_name,
+      hospital,
+      thisYearsCount, 
+      ytdThisYearsCount,
+      gap1,
+      lastYearsCount,
+      ytdLastYearsCount,
+      gap2, 
+      change, 
+      ytdChange
+    ),
+  totalRow
+) %>% mutate(
+  hospital_group_long_name = ifelse(
+    duplicated(hospital_group_long_name),
+    "",
+    hospital_group_long_name
+  )
+) -> edAttendsByHosp
+
+for(c in c("lastYearsCount", "thisYearsCount", "ytdLastYearsCount", "ytdThisYearsCount")){
+  edAttendsByHosp[, c] = format(edAttendsByHosp[, c], big.mark = ",")
+}
+
+edAttendsByHosp %>% plot_ly() %>% add_table(
+  rownames = FALSE,
+  columnwidth = c(4, 2, rep(1, 8)),
+  header = list(
+    values = c(
+      "",
+      "", 
+      paste(MMMM, YYYY0, sep = "<br>"),
+      paste0(MMMM, "<br>", YYYY0, " YTD"),
+      "",
+      paste(MMMM, YYYY1, sep = "<br>"), 
+      paste0(MMMM, "<br>", YYYY1, " YTD"), 
+      "", 
+      "% Change<br>Month", 
+      "% Change<br>YTD"
+    ),
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = c(
+        "skyblue", "skyblue", "skyblue", "skyblue", 
+        "white", 
+        "skyblue", "skyblue", 
+        "white",  
+        "skyblue", "skyblue"
+      )
+    )
+  ),
+  cells = list(
+    height = 25,
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = list(
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue")
+      )
+    )
+  )
+) %>%
+  layout(
+    font = list(
+      family = "Trebuchet MS",
+      size = 16,
+      color = "grey31"
+    ),
+    autosize = FALSE,
+    width = 1300,
+    height = 975,
+    margin = list(t = 5, b = 5, r = 5, l = 5)
+  ) %>%
+  export(file = "edAttendsTableUnknown.png")
+```
+
+## ED Departures By Destination
+
+```{r destinationTable}
+edData %>% 
+  mutate(
+    count = 1,
+    regmonth = as.Date(
+      format(
+        reg, 
+        "%Y-%m-01"
+      )
+    ),
+    departmonth = as.Date(
+      format(
+        depart,
+        "%Y-%m-01"
+      )
+    )
+  ) %>%
+  subset(departmonth == max(regmonth)) %>%
+  group_by(destination) %>%
+  mutate(count = sum(count)) %>%
+  ungroup() %>%
+  select(departmonth, destination, count) %>%
+  distinct() %>%
+  mutate(portion = count/sum(count)) %>%
+  arrange(-portion) -> d
+
+d %>% pull(departmonth) %>% unique() %>% format("%B %Y") -> sbttl
+
+d1 = rbind(
+  d %>% select(destination, count, portion),
+  data.frame(
+    destination = "<b>Total ED Departures</b>",
+    count = sum(d$count),
+    portion = 1
+  )
+) %>%
+  mutate(
+    count = ifelse(destination == "<b>Total ED Departures</b>", paste0("<b>", format(count, big.mark = ","), "</b>"), format(count, big.mark = ",")),
+    portion = ifelse(destination == "<b>Total ED Departures</b>", paste0("<b>100%</b>"), paste0(round(100*portion, 1), "%")), count = gsub(" ", "", count))
+
+d1 %>% plot_ly() %>%
+  add_table(
+    rownames = FALSE,
+    columnwidth = c(2,1,1),
+    header = list(
+      height = 30,
+      values = c(
+        paste0("<b>ED Departures</b><br><i>", sbttl, "</i><br><br><b>Destination</b>"),
+        "<br><br><br><br><b>Total</b>",
+        "<br><br><br><br><b>% of Total</b>"
+      ),
+      line = list(width = 0),
+      align = rep("left", 3)
+    ),
+    cells = list(
+      height = 30,
+      align = rep("left", 3),
+      line = list(width = 0),
+      fill = list(
+        color = list(
+          rep(
+            c(
+              rep("white", nrow(d1)-1),
+              "white"
+            ),
+            3
+          )
+        )
+      )
+    )
+  ) %>%
+  layout(
+    font = list(
+      family = "Trebuchet MS",
+      size = 25,
+      color = "grey31"
+    ),
+    autosize = FALSE,
+    width = 1300,
+    height = 975,
+    margin = list(t = 5, b = 5, l = 5, r = 5)
+  ) %>%
+  export(file = "destinationTable.png")
+```
+
+
+# ED Admissions
+
+## ED Admissions Trend (Bar)
+
+```{r admtrend}
+edData %>% mutate(
+  regmonth = as.integer(format(reg, "%m")), 
+  regyear = as.integer(format(reg, "%Y")), 
+  departyear = as.integer(format(depart, "%Y")),
+  departmonth = format(depart, "%b"),
+  departmonthnumber = as.integer(format(depart, "%m")),
+  count = 1
+) %>% subset(
+  destination %in% admDests
+  & complete.cases(departyear)
+  & as.Date(depart) <= max(as.Date(reg))
+) %>% subset(departyear >= max(departyear)-1) %>% group_by(
+  departyear, 
+  departmonth,
+  departmonthnumber
+) %>% mutate(
+  count = sum(count)
+) %>% ungroup() %>% select(
+  departyear,
+  departmonth,
+  departmonthnumber,
+  count
+) %>% 
+  
+  distinct() %>%
+
+  mutate(maxyear = max(departyear), departyear = ifelse(departyear==max(departyear), "Y1", "Y0")) %>% 
+  
+  spread(departyear, count) %>% 
+  
+  mutate(Y1 = ifelse(is.na(Y1), 0, Y1)) %>% 
+  
+  melt(c("departmonth", "departmonthnumber", "maxyear")) %>% 
+  
+  rename(count = value, departyear=variable) %>% 
+  
+  mutate(departyear = ifelse(departyear == "Y1", maxyear, maxyear-1)) -> D
+
+
+
+D %>% ggplot(aes(x = reorder(departmonth, departmonthnumber), y = count, fill = factor(departyear))) + 
+  
+  geom_bar(stat = "identity", position = "dodge") +
+  
+  geom_text(color = "white", size = txt_sz, aes(x = departmonth, y = count, label = ifelse(count ==0, "", format(count, big.mark = ",")), family = "Trebuchet MS"), 
+            
+            angle = 90,
+            
+            vjust = ifelse(D$departyear == max(D$departyear), 2, -1),
+            
+            hjust = 1
+            
+            ) +
+  
+  labs(title = "ED Attendances") + 
+  
+  scale_fill_manual(values = c(red, blue)) +
+  
+  scale_y_continuous(limits = c(0, 1.1*max(D$count))) +
+  
+  theme(panel.background = x, legend.title = x, text = f1, axis.line = x, legend.position = "top", axis.title = x, axis.text.x = rotated_f1, axis.text.y = x, plot.title = title_style) + 
+  
+  guides(fill = guide_legend(override.aes = list(size = 30)))
+```
+
+## ED Admissions Age Profile
+
+```{r edAdmissionsAgePie, eval=FALSE}
+edData %>% 
+  
+  mutate(
+    regmonth = as.Date(format(reg, "%Y-%m-01")),
+    departmonth = as.Date(format(depart, "%Y-%m-01"))
+  ) %>% 
+  
+  subset(departmonth == max(regmonth) & destination %in% admDests) %>% 
+  
+  mutate(ageGroup = ifelse(is.na(age) | age < 0 | age >= 110, "Unknown", 
+                           ifelse(age < 16, "Paediatrics: 0-15", 
+                                  ifelse(age >= 16 & age < 75, "Adults: 16-74", 
+                                         "Adults: 75+"))),
+         count = 1) %>%
+  group_by(ageGroup) %>%
+  mutate(count = sum(count)) %>%
+  distinct(departmonth, ageGroup, count) %>%
+  
+  arrange(ageGroup) %>%
+  
+  plot_ly() %>%
+  add_pie(values = ~count, labels = ~ageGroup, textinfo = "label+value+percent", showlegend = FALSE, marker = list(colors = c(red, green, blue, orange))) %>%
+  layout(font = list(family = "Trebuchet MS", size = 100, color = "grey31"),
+         #autosize = FALSE, width = 1300, height = 975,
+         margin = list(r = 5, l = 5, t = 5, b = 5))
+```
+
+```{r edAdmissionsAgePie2}
+edData %>% 
+  mutate(
+    regmonth = as.Date(format(reg, "%Y-%m-01")),
+    departmonth = as.Date(format(depart, "%Y-%m-01"))
+  ) %>% 
+  subset(departmonth == max(regmonth) & destination %in% admDests) %>% 
+  mutate(ageGroup = ifelse(is.na(age) | age < 0 | age >= 110, "Unknown", 
+                           ifelse(age < 16, "Paediatrics: 0-15", 
+                                  ifelse(age >= 16 & age < 75, "Adults: 16-74", 
+                                         "Adults: 75+"))),
+         count = 1) %>%
+  group_by(ageGroup) %>%
+  mutate(count = sum(count)) %>%
+  
+  ungroup() %>%
+  
+  distinct(departmonth, ageGroup, count) %>%
+  
+  arrange(desc(ageGroup)) %>%
+  
+  mutate(portion = 100*count/sum(count), ypos = ifelse(ageGroup == "Unknown", 90, cumsum(portion) - 0.5*portion), lbl = paste0(round(portion, 1), "%")) -> D
+
+D %>% pull(departmonth) %>% unique() %>% format("%B %Y") -> sbttl
+
+D %>% ggplot(aes(x = "", fill = ageGroup)) + geom_bar(aes(y = portion), stat = "identity") + coord_polar(theta = "y", direction = -1, start = 0) + scale_fill_manual(values = c(red, green, blue, orange)) + theme(panel.background = x, legend.title = x, legend.text = f1, legend.position = "bottom", legend.direction = "horizontal", axis.title = x, axis.ticks = x, axis.text = x) + geom_text(color = "grey31", aes(y = ypos, label = paste(ageGroup, format(count, big.mark = ","), lbl, sep = "\n")), family = "Trebuchet MS", size = txt_sz*1.2) + legendFixFill + labs(title = "ED Admissions Age Profile", subtitle = sbttl) + theme(plot.title = title_style, plot.subtitle = subtitle_style)
+```
+
+## ED Admissions Month & YTD
+
+```{r edAdmissionsTable, eval = FALSE}
+edAttendsByHosp = edData %>% subset(
+  as.Date(depart) <= as.Date(reg)
+) %>% mutate(
+  month = as.integer(format(depart, "%m")), 
+  year = as.integer(format(depart, "%Y")),
+  lastYearsCount = ifelse(year == max(year)-1, 1, 0),
+  thisYearsCount = ifelse(year == max(year), 1, 0)
+) %>% 
+  subset(
+    year >= max(year)-1
+    
+  ) %>% 
+  merge(y = read.csv(file = "~/provider_codes.csv", stringsAsFactors = FALSE) %>%
+          select(biu_hospital_id, hospital_group_long_name, hospital),
+        by = "biu_hospital_id", all = FALSE) %>%
+  group_by(month, hospital) %>%
+  mutate(lastYearsCount = sum(lastYearsCount),
+         thisYearsCount = sum(thisYearsCount)) %>%
+  ungroup() %>%
+  mutate(presentYear = max(year)) %>%
+  select(hospital_group_long_name, hospital, month, presentYear, lastYearsCount, thisYearsCount) %>%
+  distinct() %>% arrange(hospital_group_long_name, hospital, month) %>%
+  group_by(hospital) %>% 
+  mutate(ytdLastYearsCount = cumsum(lastYearsCount),
+         ytdThisYearsCount = cumsum(thisYearsCount)) %>%
+  ungroup() %>% 
+  subset(thisYearsCount != 0 & complete.cases(thisYearsCount)) %>% 
+  subset(month == max(month)) %>%
+  select(presentYear, month, hospital_group_long_name, hospital, lastYearsCount, thisYearsCount, ytdLastYearsCount, ytdThisYearsCount) %>%
+  mutate(change = ifelse(complete.cases(lastYearsCount) & lastYearsCount != 0,
+                         ifelse(lastYearsCount > thisYearsCount,
+                                paste0(round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%"),
+                                paste0("+", round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%")),
+                         ""),
+         ytdChange = ifelse(complete.cases(ytdLastYearsCount) & ytdLastYearsCount != 0,
+                            ifelse(ytdLastYearsCount > ytdThisYearsCount,
+                                   paste0(round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%"),
+                                   paste0("+", round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%")),
+                            "")) %>% 
+  subset(complete.cases(hospital)) %>%
+  data.frame() %>%
+  mutate(gap1 = "", gap2 = "")
+
+
+MMMM = format(as.Date(paste(max(edAttendsByHosp$presentYear)-1,
+                            max(edAttendsByHosp$month),
+                            1, sep = "-")), "%B")
+
+YYYY1 = max(edAttendsByHosp$presentYear)
+YYYY0 = YYYY1 - 1
+
+totalRow = data.frame(lastYearsCount = sum(edAttendsByHosp$lastYearsCount),
+                      thisYearsCount = sum(edAttendsByHosp$thisYearsCount),
+                      gap1 = "",
+                      ytdLastYearsCount = sum(edAttendsByHosp$ytdLastYearsCount),
+                      ytdThisYearsCount = sum(edAttendsByHosp$ytdThisYearsCount),
+                      gap2 = "",
+                      hospital_group_long_name = "Total",
+                      hospital = "")
+
+totalRow$change = ifelse(totalRow$lastYearsCount > totalRow$thisYearsCount,
+                         paste0(round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"),
+                         paste0("+", round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"))
+
+totalRow$ytdChange = ifelse(totalRow$ytdLastYearsCount > totalRow$ytdThisYearsCount,
+                            paste0(round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"),
+                            paste0("+", round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"))
+
+rbind(
+  edAttendsByHosp %>%
+    select(
+      hospital_group_long_name,
+      hospital,
+      thisYearsCount, 
+      ytdThisYearsCount,
+      gap1,
+      lastYearsCount,
+      ytdLastYearsCount,
+      gap2, 
+      change, 
+      ytdChange
+    ),
+  totalRow
+) %>% mutate(
+  hospital_group_long_name = ifelse(
+    duplicated(hospital_group_long_name),
+    "",
+    hospital_group_long_name
+  )
+) -> edAttendsByHosp
+
+for(c in c("lastYearsCount", "thisYearsCount", "ytdLastYearsCount", "ytdThisYearsCount")){
+  edAttendsByHosp[, c] = format(edAttendsByHosp[, c], big.mark = ",")
+}
+
+edAttendsByHosp %>% plot_ly() %>% add_table(
+  rownames = FALSE,
+  columnwidth = c(4, 2, rep(1, 8)),
+  header = list(
+    values = c(
+      "",
+      "", 
+      paste(MMMM, YYYY0, sep = "<br>"),
+      paste0(MMMM, "<br>", YYYY0, " YTD"),
+      "",
+      paste(MMMM, YYYY1, sep = "<br>"), 
+      paste0(MMMM, "<br>", YYYY1, " YTD"), 
+      "", 
+      "% Change<br>Month", 
+      "% Change<br>YTD"
+    ),
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = c(
+        "skyblue", "skyblue", "skyblue", "skyblue", 
+        "white", 
+        "skyblue", "skyblue", 
+        "white",  
+        "skyblue", "skyblue"
+      )
+    )
+  ),
+  cells = list(
+    height = 25,
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = list(
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue")
+      )
+    )
+  )
+) %>%
+  layout(
+    font = list(
+      family = "Trebuchet MS",
+      size = 16,
+      color = "grey31"
+    ),
+    autosize = FALSE,
+    width = 1300,
+    height = 975,
+    margin = list(t = 5, b = 5, r = 5, l = 5)
+  ) %>%
+  export(file = "edAdmissionsTable.png")
+```
+
+## ED Admissions (Ages: 0-15) Month & YTD
+
+```{r edAdmissionsTable015, eval = FALSE}
+edAttendsByHosp = edData %>% subset(
+  as.Date(depart) <= as.Date(reg)
+) %>% mutate(
+  month = as.integer(format(depart, "%m")), 
+  year = as.integer(format(depart, "%Y")),
+  lastYearsCount = ifelse(year == max(year)-1, 1, 0),
+  thisYearsCount = ifelse(year == max(year), 1, 0)
+) %>% 
+  subset(
+    year >= max(year)-1
+    & complete.cases(age)
+    & age >= 0
+    & age < 16
+  ) %>% 
+  merge(y = read.csv(file = "~/provider_codes.csv", stringsAsFactors = FALSE) %>%
+          select(biu_hospital_id, hospital_group_long_name, hospital),
+        by = "biu_hospital_id", all = FALSE) %>%
+  group_by(month, hospital) %>%
+  mutate(lastYearsCount = sum(lastYearsCount),
+         thisYearsCount = sum(thisYearsCount)) %>%
+  ungroup() %>%
+  mutate(presentYear = max(year)) %>%
+  select(hospital_group_long_name, hospital, month, presentYear, lastYearsCount, thisYearsCount) %>%
+  distinct() %>% arrange(hospital_group_long_name, hospital, month) %>%
+  group_by(hospital) %>% 
+  mutate(ytdLastYearsCount = cumsum(lastYearsCount),
+         ytdThisYearsCount = cumsum(thisYearsCount)) %>%
+  ungroup() %>% 
+  subset(thisYearsCount != 0 & complete.cases(thisYearsCount)) %>% 
+  subset(month == max(month)) %>%
+  select(presentYear, month, hospital_group_long_name, hospital, lastYearsCount, thisYearsCount, ytdLastYearsCount, ytdThisYearsCount) %>%
+  mutate(change = ifelse(complete.cases(lastYearsCount) & lastYearsCount != 0,
+                         ifelse(lastYearsCount > thisYearsCount,
+                                paste0(round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%"),
+                                paste0("+", round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%")),
+                         ""),
+         ytdChange = ifelse(complete.cases(ytdLastYearsCount) & ytdLastYearsCount != 0,
+                            ifelse(ytdLastYearsCount > ytdThisYearsCount,
+                                   paste0(round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%"),
+                                   paste0("+", round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%")),
+                            "")) %>% 
+  subset(complete.cases(hospital)) %>%
+  data.frame() %>%
+  mutate(gap1 = "", gap2 = "")
+
+
+MMMM = format(as.Date(paste(max(edAttendsByHosp$presentYear)-1,
+                            max(edAttendsByHosp$month),
+                            1, sep = "-")), "%B")
+
+YYYY1 = max(edAttendsByHosp$presentYear)
+YYYY0 = YYYY1 - 1
+
+totalRow = data.frame(lastYearsCount = sum(edAttendsByHosp$lastYearsCount),
+                      thisYearsCount = sum(edAttendsByHosp$thisYearsCount),
+                      gap1 = "",
+                      ytdLastYearsCount = sum(edAttendsByHosp$ytdLastYearsCount),
+                      ytdThisYearsCount = sum(edAttendsByHosp$ytdThisYearsCount),
+                      gap2 = "",
+                      hospital_group_long_name = "Total",
+                      hospital = "")
+
+totalRow$change = ifelse(totalRow$lastYearsCount > totalRow$thisYearsCount,
+                         paste0(round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"),
+                         paste0("+", round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"))
+
+totalRow$ytdChange = ifelse(totalRow$ytdLastYearsCount > totalRow$ytdThisYearsCount,
+                            paste0(round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"),
+                            paste0("+", round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"))
+
+rbind(
+  edAttendsByHosp %>%
+    select(
+      hospital_group_long_name,
+      hospital,
+      thisYearsCount, 
+      ytdThisYearsCount,
+      gap1,
+      lastYearsCount,
+      ytdLastYearsCount,
+      gap2, 
+      change, 
+      ytdChange
+    ),
+  totalRow
+) %>% mutate(
+  hospital_group_long_name = ifelse(
+    duplicated(hospital_group_long_name),
+    "",
+    hospital_group_long_name
+  )
+) -> edAttendsByHosp
+
+for(c in c("lastYearsCount", "thisYearsCount", "ytdLastYearsCount", "ytdThisYearsCount")){
+  edAttendsByHosp[, c] = format(edAttendsByHosp[, c], big.mark = ",")
+}
+
+edAttendsByHosp %>% plot_ly() %>% add_table(
+  rownames = FALSE,
+  columnwidth = c(4, 2, rep(1, 8)),
+  header = list(
+    values = c(
+      "",
+      "", 
+      paste(MMMM, YYYY0, sep = "<br>"),
+      paste0(MMMM, "<br>", YYYY0, " YTD"),
+      "",
+      paste(MMMM, YYYY1, sep = "<br>"), 
+      paste0(MMMM, "<br>", YYYY1, " YTD"), 
+      "", 
+      "% Change<br>Month", 
+      "% Change<br>YTD"
+    ),
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = c(
+        "skyblue", "skyblue", "skyblue", "skyblue", 
+        "white", 
+        "skyblue", "skyblue", 
+        "white",  
+        "skyblue", "skyblue"
+      )
+    )
+  ),
+  cells = list(
+    height = 25,
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = list(
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue")
+      )
+    )
+  )
+) %>%
+  layout(
+    font = list(
+      family = "Trebuchet MS",
+      size = 16,
+      color = "grey31"
+    ),
+    autosize = FALSE,
+    width = 1300,
+    height = 975,
+    margin = list(t = 5, b = 5, r = 5, l = 5)
+  ) %>%
+  export(file = "edAdmissionsTable015.png")
+
+```
+
+## ED Admissions (Ages: 16-74) Month & YTD
+
+```{r edAdmissionsTable1674, eval = FALSE}
+edAttendsByHosp = edData %>% subset(
+  as.Date(depart) <= as.Date(reg)
+) %>% mutate(
+  month = as.integer(format(depart, "%m")), 
+  year = as.integer(format(depart, "%Y")),
+  lastYearsCount = ifelse(year == max(year)-1, 1, 0),
+  thisYearsCount = ifelse(year == max(year), 1, 0)
+) %>% 
+  subset(
+    year >= max(year)-1
+    & complete.cases(age)
+    & age >= 16
+    & age < 75
+  ) %>% 
+  merge(y = read.csv(file = "~/provider_codes.csv", stringsAsFactors = FALSE) %>%
+          select(biu_hospital_id, hospital_group_long_name, hospital),
+        by = "biu_hospital_id", all = FALSE) %>%
+  group_by(month, hospital) %>%
+  mutate(lastYearsCount = sum(lastYearsCount),
+         thisYearsCount = sum(thisYearsCount)) %>%
+  ungroup() %>%
+  mutate(presentYear = max(year)) %>%
+  select(hospital_group_long_name, hospital, month, presentYear, lastYearsCount, thisYearsCount) %>%
+  distinct() %>% arrange(hospital_group_long_name, hospital, month) %>%
+  group_by(hospital) %>% 
+  mutate(ytdLastYearsCount = cumsum(lastYearsCount),
+         ytdThisYearsCount = cumsum(thisYearsCount)) %>%
+  ungroup() %>% 
+  subset(thisYearsCount != 0 & complete.cases(thisYearsCount)) %>% 
+  subset(month == max(month)) %>%
+  select(presentYear, month, hospital_group_long_name, hospital, lastYearsCount, thisYearsCount, ytdLastYearsCount, ytdThisYearsCount) %>%
+  mutate(change = ifelse(complete.cases(lastYearsCount) & lastYearsCount != 0,
+                         ifelse(lastYearsCount > thisYearsCount,
+                                paste0(round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%"),
+                                paste0("+", round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%")),
+                         ""),
+         ytdChange = ifelse(complete.cases(ytdLastYearsCount) & ytdLastYearsCount != 0,
+                            ifelse(ytdLastYearsCount > ytdThisYearsCount,
+                                   paste0(round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%"),
+                                   paste0("+", round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%")),
+                            "")) %>% 
+  subset(complete.cases(hospital)) %>%
+  data.frame() %>%
+  mutate(gap1 = "", gap2 = "")
+
+
+MMMM = format(as.Date(paste(max(edAttendsByHosp$presentYear)-1,
+                            max(edAttendsByHosp$month),
+                            1, sep = "-")), "%B")
+
+YYYY1 = max(edAttendsByHosp$presentYear)
+YYYY0 = YYYY1 - 1
+
+totalRow = data.frame(lastYearsCount = sum(edAttendsByHosp$lastYearsCount),
+                      thisYearsCount = sum(edAttendsByHosp$thisYearsCount),
+                      gap1 = "",
+                      ytdLastYearsCount = sum(edAttendsByHosp$ytdLastYearsCount),
+                      ytdThisYearsCount = sum(edAttendsByHosp$ytdThisYearsCount),
+                      gap2 = "",
+                      hospital_group_long_name = "Total",
+                      hospital = "")
+
+totalRow$change = ifelse(totalRow$lastYearsCount > totalRow$thisYearsCount,
+                         paste0(round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"),
+                         paste0("+", round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"))
+
+totalRow$ytdChange = ifelse(totalRow$ytdLastYearsCount > totalRow$ytdThisYearsCount,
+                            paste0(round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"),
+                            paste0("+", round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"))
+
+rbind(
+  edAttendsByHosp %>%
+    select(
+      hospital_group_long_name,
+      hospital,
+      thisYearsCount, 
+      ytdThisYearsCount,
+      gap1,
+      lastYearsCount,
+      ytdLastYearsCount,
+      gap2, 
+      change, 
+      ytdChange
+    ),
+  totalRow
+) %>% mutate(
+  hospital_group_long_name = ifelse(
+    duplicated(hospital_group_long_name),
+    "",
+    hospital_group_long_name
+  )
+) -> edAttendsByHosp
+
+for(c in c("lastYearsCount", "thisYearsCount", "ytdLastYearsCount", "ytdThisYearsCount")){
+  edAttendsByHosp[, c] = format(edAttendsByHosp[, c], big.mark = ",")
+}
+
+edAttendsByHosp %>% plot_ly() %>% add_table(
+  rownames = FALSE,
+  columnwidth = c(4, 2, rep(1, 8)),
+  header = list(
+    values = c(
+      "",
+      "", 
+      paste(MMMM, YYYY0, sep = "<br>"),
+      paste0(MMMM, "<br>", YYYY0, " YTD"),
+      "",
+      paste(MMMM, YYYY1, sep = "<br>"), 
+      paste0(MMMM, "<br>", YYYY1, " YTD"), 
+      "", 
+      "% Change<br>Month", 
+      "% Change<br>YTD"
+    ),
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = c(
+        "skyblue", "skyblue", "skyblue", "skyblue", 
+        "white", 
+        "skyblue", "skyblue", 
+        "white",  
+        "skyblue", "skyblue"
+      )
+    )
+  ),
+  cells = list(
+    height = 25,
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = list(
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue")
+      )
+    )
+  )
+) %>%
+  layout(
+    font = list(
+      family = "Trebuchet MS",
+      size = 16,
+      color = "grey31"
+    ),
+    autosize = FALSE,
+    width = 1300,
+    height = 975,
+    margin = list(t = 5, b = 5, r = 5, l = 5)
+  ) %>%
+  export(file = "edAdmissionsTable1674.png")
+
+```
+
+## ED Admissions (Ages: 75+) Month & YTD
+
+```{r edAdmissionsTable75, eval = FALSE}
+edAttendsByHosp = edData %>% subset(
+  as.Date(depart) <= as.Date(reg)
+) %>% mutate(
+  month = as.integer(format(depart, "%m")), 
+  year = as.integer(format(depart, "%Y")),
+  lastYearsCount = ifelse(year == max(year)-1, 1, 0),
+  thisYearsCount = ifelse(year == max(year), 1, 0)
+) %>% 
+  subset(
+    year >= max(year)-1
+    & complete.cases(age)
+    & age >= 75
+    & age < 110
+  ) %>% 
+  merge(y = read.csv(file = "~/provider_codes.csv", stringsAsFactors = FALSE) %>%
+          select(biu_hospital_id, hospital_group_long_name, hospital),
+        by = "biu_hospital_id", all = FALSE) %>%
+  group_by(month, hospital) %>%
+  mutate(lastYearsCount = sum(lastYearsCount),
+         thisYearsCount = sum(thisYearsCount)) %>%
+  ungroup() %>%
+  mutate(presentYear = max(year)) %>%
+  select(hospital_group_long_name, hospital, month, presentYear, lastYearsCount, thisYearsCount) %>%
+  distinct() %>% arrange(hospital_group_long_name, hospital, month) %>%
+  group_by(hospital) %>% 
+  mutate(ytdLastYearsCount = cumsum(lastYearsCount),
+         ytdThisYearsCount = cumsum(thisYearsCount)) %>%
+  ungroup() %>% 
+  subset(thisYearsCount != 0 & complete.cases(thisYearsCount)) %>% 
+  subset(month == max(month)) %>%
+  select(presentYear, month, hospital_group_long_name, hospital, lastYearsCount, thisYearsCount, ytdLastYearsCount, ytdThisYearsCount) %>%
+  mutate(change = ifelse(complete.cases(lastYearsCount) & lastYearsCount != 0,
+                         ifelse(lastYearsCount > thisYearsCount,
+                                paste0(round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%"),
+                                paste0("+", round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%")),
+                         ""),
+         ytdChange = ifelse(complete.cases(ytdLastYearsCount) & ytdLastYearsCount != 0,
+                            ifelse(ytdLastYearsCount > ytdThisYearsCount,
+                                   paste0(round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%"),
+                                   paste0("+", round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%")),
+                            "")) %>% 
+  subset(complete.cases(hospital)) %>%
+  data.frame() %>%
+  mutate(gap1 = "", gap2 = "")
+
+
+MMMM = format(as.Date(paste(max(edAttendsByHosp$presentYear)-1,
+                            max(edAttendsByHosp$month),
+                            1, sep = "-")), "%B")
+
+YYYY1 = max(edAttendsByHosp$presentYear)
+YYYY0 = YYYY1 - 1
+
+totalRow = data.frame(lastYearsCount = sum(edAttendsByHosp$lastYearsCount),
+                      thisYearsCount = sum(edAttendsByHosp$thisYearsCount),
+                      gap1 = "",
+                      ytdLastYearsCount = sum(edAttendsByHosp$ytdLastYearsCount),
+                      ytdThisYearsCount = sum(edAttendsByHosp$ytdThisYearsCount),
+                      gap2 = "",
+                      hospital_group_long_name = "Total",
+                      hospital = "")
+
+totalRow$change = ifelse(totalRow$lastYearsCount > totalRow$thisYearsCount,
+                         paste0(round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"),
+                         paste0("+", round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"))
+
+totalRow$ytdChange = ifelse(totalRow$ytdLastYearsCount > totalRow$ytdThisYearsCount,
+                            paste0(round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"),
+                            paste0("+", round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"))
+
+rbind(
+  edAttendsByHosp %>%
+    select(
+      hospital_group_long_name,
+      hospital,
+      thisYearsCount, 
+      ytdThisYearsCount,
+      gap1,
+      lastYearsCount,
+      ytdLastYearsCount,
+      gap2, 
+      change, 
+      ytdChange
+    ),
+  totalRow
+) %>% mutate(
+  hospital_group_long_name = ifelse(
+    duplicated(hospital_group_long_name),
+    "",
+    hospital_group_long_name
+  )
+) -> edAttendsByHosp
+
+for(c in c("lastYearsCount", "thisYearsCount", "ytdLastYearsCount", "ytdThisYearsCount")){
+  edAttendsByHosp[, c] = format(edAttendsByHosp[, c], big.mark = ",")
+}
+
+edAttendsByHosp %>% plot_ly() %>% add_table(
+  rownames = FALSE,
+  columnwidth = c(4, 2, rep(1, 8)),
+  header = list(
+    values = c(
+      "",
+      "", 
+      paste(MMMM, YYYY0, sep = "<br>"),
+      paste0(MMMM, "<br>", YYYY0, " YTD"),
+      "",
+      paste(MMMM, YYYY1, sep = "<br>"), 
+      paste0(MMMM, "<br>", YYYY1, " YTD"), 
+      "", 
+      "% Change<br>Month", 
+      "% Change<br>YTD"
+    ),
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = c(
+        "skyblue", "skyblue", "skyblue", "skyblue", 
+        "white", 
+        "skyblue", "skyblue", 
+        "white",  
+        "skyblue", "skyblue"
+      )
+    )
+  ),
+  cells = list(
+    height = 25,
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = list(
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue")
+      )
+    )
+  )
+) %>%
+  layout(
+    font = list(
+      family = "Trebuchet MS",
+      size = 16,
+      color = "grey31"
+    ),
+    autosize = FALSE,
+    width = 1300,
+    height = 975,
+    margin = list(t = 5, b = 5, r = 5, l = 5)
+  ) %>%
+  export(file = "edAdmissionsTable75.png")
+
+```
+
+## ED Admissions (Ages: Unknown) Month & YTD
+
+```{r edAdmissionsTableUnknown, eval = FALSE}
+edAttendsByHosp = edData %>% subset(
+  as.Date(depart) <= as.Date(reg)
+) %>% mutate(
+  month = as.integer(format(depart, "%m")), 
+  year = as.integer(format(depart, "%Y")),
+  lastYearsCount = ifelse(year == max(year)-1, 1, 0),
+  thisYearsCount = ifelse(year == max(year), 1, 0)
+) %>% 
+  subset(
+    year >= max(year)-1
+    & (is.na(age)
+    | age >= 110
+    | age < 0)
+  ) %>% 
+  merge(y = read.csv(file = "~/provider_codes.csv", stringsAsFactors = FALSE) %>%
+          select(biu_hospital_id, hospital_group_long_name, hospital),
+        by = "biu_hospital_id", all = FALSE) %>%
+  group_by(month, hospital) %>%
+  mutate(lastYearsCount = sum(lastYearsCount),
+         thisYearsCount = sum(thisYearsCount)) %>%
+  ungroup() %>%
+  mutate(presentYear = max(year)) %>%
+  select(hospital_group_long_name, hospital, month, presentYear, lastYearsCount, thisYearsCount) %>%
+  distinct() %>% arrange(hospital_group_long_name, hospital, month) %>%
+  group_by(hospital) %>% 
+  mutate(ytdLastYearsCount = cumsum(lastYearsCount),
+         ytdThisYearsCount = cumsum(thisYearsCount)) %>%
+  ungroup() %>% 
+  subset(thisYearsCount != 0 & complete.cases(thisYearsCount)) %>% 
+  subset(month == max(month)) %>%
+  select(presentYear, month, hospital_group_long_name, hospital, lastYearsCount, thisYearsCount, ytdLastYearsCount, ytdThisYearsCount) %>%
+  mutate(change = ifelse(complete.cases(lastYearsCount) & lastYearsCount != 0,
+                         ifelse(lastYearsCount > thisYearsCount,
+                                paste0(round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%"),
+                                paste0("+", round(100*(thisYearsCount-lastYearsCount)/lastYearsCount, 1), "%")),
+                         ""),
+         ytdChange = ifelse(complete.cases(ytdLastYearsCount) & ytdLastYearsCount != 0,
+                            ifelse(ytdLastYearsCount > ytdThisYearsCount,
+                                   paste0(round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%"),
+                                   paste0("+", round(100*(ytdThisYearsCount - ytdLastYearsCount)/ytdLastYearsCount, 1), "%")),
+                            "")) %>% 
+  subset(complete.cases(hospital)) %>%
+  data.frame() %>%
+  mutate(gap1 = "", gap2 = "")
+
+
+MMMM = format(as.Date(paste(max(edAttendsByHosp$presentYear)-1,
+                            max(edAttendsByHosp$month),
+                            1, sep = "-")), "%B")
+
+YYYY1 = max(edAttendsByHosp$presentYear)
+YYYY0 = YYYY1 - 1
+
+totalRow = data.frame(lastYearsCount = sum(edAttendsByHosp$lastYearsCount),
+                      thisYearsCount = sum(edAttendsByHosp$thisYearsCount),
+                      gap1 = "",
+                      ytdLastYearsCount = sum(edAttendsByHosp$ytdLastYearsCount),
+                      ytdThisYearsCount = sum(edAttendsByHosp$ytdThisYearsCount),
+                      gap2 = "",
+                      hospital_group_long_name = "Total",
+                      hospital = "")
+
+totalRow$change = ifelse(totalRow$lastYearsCount > totalRow$thisYearsCount,
+                         paste0(round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"),
+                         paste0("+", round(100*(totalRow$thisYearsCount - totalRow$lastYearsCount)/totalRow$lastYearsCount, 1), "%"))
+
+totalRow$ytdChange = ifelse(totalRow$ytdLastYearsCount > totalRow$ytdThisYearsCount,
+                            paste0(round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"),
+                            paste0("+", round(100*(totalRow$ytdThisYearsCount - totalRow$ytdLastYearsCount)/totalRow$ytdLastYearsCount, 1), "%"))
+
+rbind(
+  edAttendsByHosp %>%
+    select(
+      hospital_group_long_name,
+      hospital,
+      thisYearsCount, 
+      ytdThisYearsCount,
+      gap1,
+      lastYearsCount,
+      ytdLastYearsCount,
+      gap2, 
+      change, 
+      ytdChange
+    ),
+  totalRow
+) %>% mutate(
+  hospital_group_long_name = ifelse(
+    duplicated(hospital_group_long_name),
+    "",
+    hospital_group_long_name
+  )
+) -> edAttendsByHosp
+
+for(c in c("lastYearsCount", "thisYearsCount", "ytdLastYearsCount", "ytdThisYearsCount")){
+  edAttendsByHosp[, c] = format(edAttendsByHosp[, c], big.mark = ",")
+}
+
+edAttendsByHosp %>% plot_ly() %>% add_table(
+  rownames = FALSE,
+  columnwidth = c(4, 2, rep(1, 8)),
+  header = list(
+    values = c(
+      "",
+      "", 
+      paste(MMMM, YYYY0, sep = "<br>"),
+      paste0(MMMM, "<br>", YYYY0, " YTD"),
+      "",
+      paste(MMMM, YYYY1, sep = "<br>"), 
+      paste0(MMMM, "<br>", YYYY1, " YTD"), 
+      "", 
+      "% Change<br>Month", 
+      "% Change<br>YTD"
+    ),
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = c(
+        "skyblue", "skyblue", "skyblue", "skyblue", 
+        "white", 
+        "skyblue", "skyblue", 
+        "white",  
+        "skyblue", "skyblue"
+      )
+    )
+  ),
+  cells = list(
+    height = 25,
+    align = c("left", "left", rep("center", 8)),
+    line = list(width = 0),
+    fill = list(
+      color = list(
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        "white",
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue"),
+        c(rep("white", nrow(edAttendsByHosp)-1), "skyblue")
+      )
+    )
+  )
+) %>%
+  layout(
+    font = list(
+      family = "Trebuchet MS",
+      size = 16,
+      color = "grey31"
+    ),
+    autosize = FALSE,
+    width = 1300,
+    height = 975,
+    margin = list(t = 5, b = 5, r = 5, l = 5)
+  ) %>%
+  export(file = "edAdmissionsTableUnknown.png")
+
+```
+
+## Admission % by Hospital
+
+```{r admRateByHosp}
+edData %>% 
+  mutate(
+    regmonth = as.Date(format(reg, "%Y-%m-01")),
+    departmonth = as.Date(format(depart, "%Y-%m-01"))
+  ) %>%
+  subset(departmonth == max(regmonth)) %>%
+  mutate(
+    departures = 1,
+    adm = ifelse(destination %in% admDests, 1, 0),
+    nadm = ifelse(!(destination %in% admDests), 1, 0)
+  ) %>%
+  group_by(biu_hospital_id) %>%
+  mutate(
+    admcount = sum(adm),
+    nadmcount = sum(nadm)
+  ) %>%
+  
+  ungroup() %>% 
+  
+  distinct(departmonth, biu_hospital_id, admcount, nadmcount) %>%
+  
+  melt(id.vars = c("biu_hospital_id", "departmonth")) %>%
+  
+  group_by(biu_hospital_id) %>%
+  
+  mutate(departures = sum(value)) %>% 
+  
+  ungroup() %>%
+  
+  mutate(rate = paste0(round(100*value/departures, 1), "%"), label = paste0(format(value, big.mark = ","), " (", rate, ")")) %>%
+  
+  #mutate(rate = paste0(round(100*value/departures, 1), "%"), label = ifelse(variable == "admcount", paste0(format(value, big.mark = ","), " (", rate, ")"), format(value, big.mark = ","))) %>%
+  
+  merge(y = read.csv(file = "~/provider_codes.csv", stringsAsFactors = FALSE) %>% select(biu_hospital_id, hospital), by = "biu_hospital_id", all.x = TRUE) %>%
+  
+  mutate(variable = ifelse(variable == "admcount", "Admitted", "Not-Admitted"), position = ifelse(variable == "Admitted", departures-value, 0), departmonth = format(departmonth, "%B %Y")) %>%
+  
+  distinct(departmonth, hospital, variable, value, departures, position, label) -> D
+
+D %>% ggplot(aes(x = reorder(hospital, departures),  fill = variable)) + geom_bar(stat = "identity", aes(y = value)) + coord_flip() + geom_text(color = "grey31", aes(y = position, label = label), hjust = "left", family = "Trebuchet MS", size = txt_sz) + theme(axis.title = x, axis.ticks = x, axis.text = f1, panel.background = x, panel.grid.major.x = grid_line, legend.position = "top", legend.direction = "horizontal", legend.title = x, legend.text = f1, plot.title = title_style, plot.subtitle = subtitle_style) + scale_y_continuous(labels = scales::comma) + scale_fill_manual(values = c(blue, lightblue)) + labs(title = "ED Departures", subtitle = D %>% pull(departmonth) %>% unique()) + legendFixFill
+```
+
+## Admissions by Destination
+
+```{r admDestinationTable}
+d = edData %>% 
+  subset(destination %in% admDests & complete.cases(depart)) %>%
+  mutate(
+    count = 1,
+    regmonth = as.Date(
+      format(
+        reg, 
+        "%Y-%m-01"
+      )
+    ),
+    departmonth = as.Date(
+      format(
+        depart,
+        "%Y-%m-01"
+      )
+    )
+  ) %>%
+  subset(departmonth == max(regmonth)) %>%
+  group_by(destination) %>%
+  mutate(count = sum(count)) %>%
+  ungroup() %>%
+  select(departmonth, destination, count) %>%
+  distinct() %>%
+  mutate(portion = count/sum(count)) %>%
+  arrange(-portion)
+
+d %>% pull(departmonth) %>% unique() %>% format("%B %Y") -> sbttl
+
+d1 = rbind(
+  d %>% select(destination, count, portion),
+  data.frame(
+    destination = "<b>Total ED Admissions</b>",
+    count = sum(d$count),
+    portion = 1
+  )
+) %>%
+  mutate(
+    count = format(count, big.mark = ","),
+    portion = paste0(
+      round(100*portion, 1),
+      "%"
+    ),
+    count = ifelse(destination == "Total ED Admissions", paste0("<b>", count, "</b>"), count),
+    portion = ifelse(destination == "Total ED Admissions", "<b>100%</b>", portion),
+    count = gsub(" ", "", count)
+  )
+
+d1 %>% plot_ly() %>%
+  add_table(
+    rownames = FALSE,
+    columnwidth = c(2,1,1),
+    header = list(
+      height = 30,
+      values = c(
+        paste0("<b>ED Admissions</b><br><i>", sbttl, "</i><br><br><b>Destination</b>"),
+        "<br><br><br><br><b>Total</b>",
+        "<br><br><br><br><b>% of Total</b>"
+      ),
+      fill = list(color = "white"),
+      line = list(width = 0),
+      align = rep("left", 3)
+    ),
+    cells = list(
+      height = 30,
+      align = rep("left", 3),
+      line = list(width = 0),
+      fill = list(
+        color = list(
+          rep(
+            c(
+              rep("white", nrow(d1)-1),
+              "white"
+            ),
+            3
+          )
+        )
+      )
+    )
+  ) %>%
+    layout(
+      font = list(
+        family = "Trebuchet MS",
+        size = 22,
+        color = "grey31"
+      ),
+      autosize = FALSE,
+      width = 1300,
+      height = 975,
+      margin = list(t = 5, b = 5, l = 5, r = 5)
+    ) %>%
+    export(file = "admDestinationTable.png")
+#d1 %>% jltable(fileName = "tbl2.png", last_row_is_total = TRUE)  
+```
+
+
+# Quadrant Performance
+
+## Note
+
+ED records of patients with an age on registration less than 16 years are excluded from calculation of average PET and departure count.
+
+## Trolleys per 100 Departures Vs Mean PET
+
+```{r quadrant1, eval = FALSE}
+edData %>%
+  mutate(
+    departmonth = as.Date(format(depart, "%Y-%m-01")),
+    regmonth = as.Date(format(reg, "%Y-%m-01"))
+  ) %>%
+  subset(
+    complete.cases(depart) 
+    & departmonth == max(regmonth)
+    & complete.cases(age)
+    & age >= 16
+  ) %>%
+  mutate(
+    pet = ifelse(
+      depart < reg,
+      NA,
+      as.numeric(
+        difftime(
+          depart,
+          reg,
+          units = "hours"
+        )
+      )
+    ),
+    count = 1
+  ) %>%
+  subset(complete.cases(pet)) %>%
+  merge(
+    y = read.csv(
+      file = "~/provider_codes.csv",
+      stringsAsFactors = FALSE
+    ) %>% select(biu_hospital_id, hospital),
+    by = "biu_hospital_id",
+    all.x = TRUE
+  ) %>%
+  group_by(hospital) %>%
+  mutate(
+    count = sum(count),
+    pet = mean(pet)
+  ) %>%
+  ungroup() %>%
+  select(hospital, count, pet) %>%
+  distinct() %>% merge(
+    y = read.csv(
+      file = "C:/Users/jack.lyons/Downloads/TrolleyGAR.csv",
+      stringsAsFactors = FALSE
+    ) %>% select(Hospital.Code, Target.Date, Total.8am) %>% rename(
+      biu_hospital_id = Hospital.Code,
+      date = Target.Date,
+      total8am = Total.8am
+    ) %>% mutate(
+      date = as.Date(
+        format(
+          as.Date.character(
+            date,
+            "%d/%m/%Y"
+          ),
+          "%Y-%m-01"
+        )
+      )
+    ) %>% subset(
+      date == max(date)
+    ) %>% group_by(biu_hospital_id) %>% mutate(
+      total8am = sum(total8am)
+    ) %>% ungroup() %>% select(
+      biu_hospital_id, total8am
+    ) %>% distinct() %>% merge(
+      y = read.csv(
+        file = "~/provider_codes.csv",
+        stringsAsFactors = FALSE
+      ) %>% select(biu_hospital_id, hospital, hospital_group_long_name),
+      by = "biu_hospital_id",
+      all.x = TRUE
+    ) %>% select(hospital_group_long_name, hospital, total8am),
+    by = "hospital",
+    all = TRUE
+  ) %>% mutate(
+    yv = total8am*100/count
+  ) %>% subset(
+    !(hospital %in% c("Temple Street", "Tallaght Paed", "Crumlin")) 
+  ) -> D
+
+D %>% plot_ly() %>% add_markers(
+  x = ~pet,
+  y = ~yv,
+  name = ~hospital_group_long_name,
+  marker = list(size = 30)) %>% 
+  
+  add_lines(
+  y = ~median(yv),
+  x = ~pet,
+  line = list(width = 10, color = green),
+  name = ~paste(
+    "Median:", 
+    round(
+      median(yv),
+      1
+    )
+  )
+) %>% add_lines(
+  x = ~median(pet),
+  y = ~yv,
+  line = list(width = 10,
+    color = red
+  ),
+  name = ~paste(
+    "Median:", 
+    round(
+      median(pet),
+      1
+    )
+  )
+) %>% add_annotations(
+  text = ~hospital,
+  x = ~pet,
+  y = ~yv,
+  showarrow = FALSE,
+  yanchor = "top"
+) %>% layout(
+  legend = list(
+    orientation = "h",
+    x = 0,
+    y = 1.1
+  ),
+  xaxis = list(
+    title = "Average PET for ED Departures (Hours)"
+  ),
+  yaxis = list(
+    title = "Trolleys per 100 ED Departures"
+  ),
+  font = list(
+    family = "Trebuchet MS",
+    size = 80,
+    color = "grey31"
+  ),
+  margin = list(t = 5, b = 5, r = 5, l = 5))
+```
+
+```{r quadrant1_v2}
+x = element_blank()
+
+edData %>%
+  mutate(
+    departmonth = as.Date(format(depart, "%Y-%m-01")),
+    regmonth = as.Date(format(reg, "%Y-%m-01"))
+  ) %>%
+  subset(
+    complete.cases(depart) 
+    & departmonth == max(regmonth)
+    & complete.cases(age)
+    & age >= 16
+  ) %>%
+  mutate(
+    pet = ifelse(
+      depart < reg,
+      NA,
+      as.numeric(
+        difftime(
+          depart,
+          reg,
+          units = "hours"
+        )
+      )
+    ),
+    count = 1
+  ) %>%
+  subset(complete.cases(pet)) %>%
+  merge(
+    y = read.csv(
+      file = "~/provider_codes.csv",
+      stringsAsFactors = FALSE
+    ) %>% select(biu_hospital_id, hospital),
+    by = "biu_hospital_id",
+    all.x = TRUE
+  ) %>%
+  group_by(hospital) %>%
+  mutate(
+    count = sum(count),
+    pet = mean(pet)
+  ) %>%
+  ungroup() %>%
+  select(hospital, count, pet) %>%
+  distinct() %>% merge(
+    y = read.csv(
+      file = "C:/Users/jack.lyons/Downloads/TrolleyGAR.csv",
+      stringsAsFactors = FALSE
+    ) %>% select(Hospital.Code, Target.Date, Total.8am) %>% rename(
+      biu_hospital_id = Hospital.Code,
+      date = Target.Date,
+      total8am = Total.8am
+    ) %>% mutate(
+      date = as.Date(
+        format(
+          as.Date.character(
+            date,
+            "%d/%m/%Y"
+          ),
+          "%Y-%m-01"
+        )
+      )
+    ) %>% subset(
+      date == max(date)
+    ) %>% group_by(biu_hospital_id) %>% mutate(
+      total8am = sum(total8am)
+    ) %>% ungroup() %>% select(
+      date, biu_hospital_id, total8am
+    ) %>% distinct() %>% merge(
+      y = read.csv(
+        file = "~/provider_codes.csv",
+        stringsAsFactors = FALSE
+      ) %>% select(biu_hospital_id, hospital, hospital_group_long_name),
+      by = "biu_hospital_id",
+      all.x = TRUE
+    ) %>% select(hospital_group_long_name, hospital, date, total8am),
+    by = "hospital",
+    all = TRUE
+  ) %>% mutate(
+    yv = total8am*100/count
+  ) %>% subset(
+    !(hospital %in% c("Temple Street", "Tallaght Paed", "Crumlin")) 
+  ) -> D
+
+D %>% pull(date) %>% unique() %>% format("%B %Y") -> sbttl
+
+D %>% ggplot() + 
+  
+  geom_point(aes(x = pet, y = yv, color = hospital_group_long_name), size = txt_sz) + 
+  
+  geom_text(size = txt_sz, key_glyph = "rect", aes(x = pet, y = yv, color = hospital_group_long_name, label = hospital, family = "Trebuchet MS"), check_overlap = FALSE, vjust = 1.5) +
+  
+  geom_line(aes(x = pet, y = median(yv)), color = "grey31", size = 5) +
+  
+  geom_line(aes(x = median(pet), y = yv), color = "grey31", size = 5) +
+  
+  geom_text(aes(x = median(pet), y = max(yv), label = paste0(" Median: ", round(median(pet), 1)), family = "Trebuchet MS"), hjust = "left", color = "grey31", size = txt_sz) +
+  
+  geom_text(color = "grey31", aes(x = min(pet), y = median(yv), label = paste0(" Median: ", round(median(yv), 1)), family = "Trebuchet MS"), hjust = "left", vjust = -0.5, size = txt_sz) +
+  
+  labs(x = "Average PET for ED Departures (Hours)", y = "Trolleys per 100 Departures", title = "Trolley-PET Performance", subtitle = sbttl) + 
+  
+  scale_x_continuous(limits = c(floor(min(D$pet)), ceiling(max(D$pet))), breaks = seq(from = floor(min(D$pet)), to = ceiling(max(D$pet))))+
+  
+  scale_y_continuous(limits = c(floor(min(D$yv)), ceiling(max(D$yv))), breaks = seq(from = floor(min(D$yv)), to = ceiling(max(D$yv)), by = 5))+
+  
+  scale_color_manual(values = c(blue, orange, red, lightblue, green, yellow)) +
+
+  theme(panel.background = x, legend.title = x, text = f1, axis.line = element_line(color = "grey31", size = 5), legend.position = "top", legend.key = x, plot.title = title_style, plot.subtitle = subtitle_style)
+```
+
+
+## Trolleys per 100 Admissions Vs Mean Admitted PET
+
+```{r quadrant2}
+edData %>%
+  mutate(
+    departmonth = as.Date(format(depart, "%Y-%m-01")),
+    regmonth = as.Date(format(reg, "%Y-%m-01"))
+  ) %>%
+  subset(
+    destination %in% admDests
+    & complete.cases(depart) 
+    & departmonth == max(regmonth)
+    & complete.cases(age)
+    & age >= 16
+  ) %>%
+  mutate(
+    pet = ifelse(
+      depart < reg,
+      NA,
+      as.numeric(
+        difftime(
+          depart,
+          reg,
+          units = "hours"
+        )
+      )
+    ),
+    count = 1
+  ) %>%
+  subset(complete.cases(pet)) %>%
+  merge(
+    y = read.csv(
+      file = "~/provider_codes.csv",
+      stringsAsFactors = FALSE
+    ) %>% select(biu_hospital_id, hospital),
+    by = "biu_hospital_id",
+    all.x = TRUE
+  ) %>%
+  group_by(hospital) %>%
+  mutate(
+    count = sum(count),
+    pet = mean(pet)
+  ) %>%
+  ungroup() %>%
+  select(hospital, count, pet) %>%
+  distinct() %>% merge(
+    y = read.csv(
+      file = "C:/Users/jack.lyons/Downloads/TrolleyGAR.csv",
+      stringsAsFactors = FALSE
+    ) %>% select(Hospital.Code, Target.Date, Total.8am) %>% rename(
+      biu_hospital_id = Hospital.Code,
+      date = Target.Date,
+      total8am = Total.8am
+    ) %>% mutate(
+      date = as.Date(
+        format(
+          as.Date.character(
+            date,
+            "%d/%m/%Y"
+          ),
+          "%Y-%m-01"
+        )
+      )
+    ) %>% subset(
+      date == max(date)
+    ) %>% group_by(biu_hospital_id) %>% mutate(
+      total8am = sum(total8am)
+    ) %>% ungroup() %>% select(
+      biu_hospital_id, total8am
+    ) %>% distinct() %>% merge(
+      y = read.csv(
+        file = "~/provider_codes.csv",
+        stringsAsFactors = FALSE
+      ) %>% select(biu_hospital_id, hospital, hospital_group_long_name),
+      by = "biu_hospital_id",
+      all.x = TRUE
+    ) %>% select(hospital_group_long_name, hospital, total8am),
+    by = "hospital",
+    all = TRUE
+  ) %>% mutate(
+    yv = total8am*100/count
+  ) %>% subset(
+    !(hospital %in% c("Temple Street", "Tallaght Paed", "Crumlin")) 
+  ) -> D
+
+D %>% ggplot() + 
+  
+  geom_point(aes(x = pet, y = yv, color = hospital_group_long_name), size = txt_sz) + 
+  
+  geom_text(size = txt_sz, key_glyph = "rect", aes(x = pet, y = yv, color = hospital_group_long_name, label = hospital, family = "Trebuchet MS"), check_overlap = FALSE, vjust = 1.5) +
+  
+  geom_line(aes(x = pet, y = median(yv)), color = "grey31", size = 5) +
+  
+  geom_line(aes(x = median(pet), y = yv), color = "grey31", size = 5) +
+  
+  geom_text(aes(x = median(pet), y = max(yv), label = paste0(" Median: ", round(median(pet), 1)), family = "Trebuchet MS"), hjust = "left", color = "grey31", size = txt_sz) +
+  
+  geom_text(color = "grey31", aes(x = min(pet), y = median(yv), label = paste0(" Median: ", round(median(yv), 1)), family = "Trebuchet MS"), hjust = "left", vjust = -0.5, size = txt_sz) +
+  
+  labs(x = "Average PET for ED Admissions (Hours)", y = "Trolleys per 100 Admissions", title = "Trolleys-PET Performance (Admissions)", subtitle = sbttl) + 
+  
+  scale_x_continuous(limits = c(floor(min(D$pet)), ceiling(max(D$pet))), breaks = seq(from = floor(min(D$pet)), to = ceiling(max(D$pet))))+
+  
+  scale_y_continuous(limits = c(floor(min(D$yv)), ceiling(max(D$yv))), breaks = seq(from = floor(min(D$yv)), to = ceiling(max(D$yv)), by = 5))+
+  
+  scale_color_manual(values = c(blue, orange, red, lightblue, green, yellow)) +
+
+  theme(panel.background = x, legend.title = x, text = f1, axis.line = element_line(color = "grey31", size = 5), legend.position = "top", legend.key = x, plot.title = title_style, plot.subtitle = subtitle_style)
+```
+
+# Patient Experience Time
+
+## Median PET By Hospital
+
+```{r medianPETByHosp}
+edData %>%
+  mutate(
+    count = 1,
+    regmonth = as.Date(
+      format(
+        reg, 
+        "%Y-%m-01"
+      )
+    ),
+    departmonth = as.Date(
+      format(
+        depart,
+        "%Y-%m-01"
+      )
+    )
+  ) %>%
+  subset(
+    departmonth == max(regmonth)
+    & complete.cases(depart)
+  ) %>%
+  mutate(
+    pet = as.numeric(
+      difftime(
+        depart,
+        reg,
+        units = "hours"
+      )
+    )
+  ) %>%
+  
+  mutate(natmedian = median(pet)) %>%
+  
+  group_by(biu_hospital_id) %>% mutate(pet = median(pet)) %>% ungroup() %>%
+  
+  mutate(clr = ifelse(pet == natmedian, "National Median", ifelse(pet < natmedian, "Below National Median", "Above National Median"))) %>%
+  
+  select(departmonth, biu_hospital_id, pet, natmedian, clr) %>%
+  
+  distinct() %>%
+  
+  merge(
+    y = read.csv(
+      file = "~/provider_codes.csv",
+      stringsAsFactors = FALSE
+    ) %>%
+      select(biu_hospital_id, hospital) %>%
+      subset(complete.cases(biu_hospital_id)),
+    by = "biu_hospital_id",
+    all.x = TRUE
+  ) -> D
+
+D %>% pull(departmonth) %>% unique() %>% format("%B %Y") -> sbttl
+  
+  D %>% ggplot(aes(y = pet, x = reorder(hospital, pet), fill = clr)) + 
+  
+  coord_flip() + 
+  
+  geom_bar(stat = "identity", key_glyph = "rect") +
+  
+  geom_text(size = txt_sz,
+            
+            color = "grey31",
+            
+            key_glyph = "rect", 
+            
+            aes(label = round(pet, 1), family = "Trebuchet MS"), hjust = "left") +
+  
+  labs(x = "", y = "Hours", title = "Median PET", subtitle = sbttl) + 
+  
+  scale_fill_manual(values = c(red, green)) +
+  
+  guides(fill = guide_legend(override.aes = list(size = 30))) +
+  
+  theme(panel.background = x, 
+        
+        plot.title = title_style,
+        
+        plot.subtitle = subtitle_style,
+        
+        legend.title = x, 
+        
+        text = f1, 
+        
+        axis.line = x,
+        
+        panel.grid.major.x = grid_line,
+        
+        legend.position = "top"
+        
+        )
+```
+
+## PET Performance
+
+```{r petPerformance}
+edData %>%
+  subset(
+    complete.cases(depart)
+    & as.Date(depart) <= max(as.Date(reg))
+  ) %>%
+  mutate(
+    pet = ifelse(
+      depart >= reg,
+      as.numeric(
+        difftime(
+          depart,
+          reg,
+          units = "hours"
+        )
+      ),
+      NA
+    ),
+    petlt6 = ifelse(pet < 6, 1, 0),
+    petlt9 = ifelse(pet < 9, 1, 0),
+    month = as.Date(format(depart, "%Y-%m-01"))
+  ) %>%
+  subset(complete.cases(pet)) %>%
+  group_by(month) %>%
+  mutate(
+    petlt6 = mean(petlt6),
+    petlt9 = mean(petlt9)
+  ) %>%
+  ungroup() %>%
+  select(month, petlt6, petlt9) %>%
+  distinct() %>%
+  arrange(month) %>%
+  
+  melt("month") %>%
+  
+  mutate(variable = ifelse(variable == "petlt6", "PET < 6 Hours", "PET < 9 Hours")) -> D
+
+D %>% ggplot(aes(x = month, color = variable)) + 
+  
+  geom_point(aes(y = value), size = pnt_sz, key_glyph = "rect") + geom_line(aes(y = value), size = line_sz, key_glyph = "rect") +
+  
+  labs(title = "% of ED Departures") + 
+  
+  scale_x_date(breaks = D$month, labels = format(D$month, "%b %Y")) +
+  
+  scale_y_continuous(breaks = seq(from = round(min(D$value), 1), to = round(max(D$value), 1), by = 0.05), labels = paste0(round(100*seq(from = round(min(D$value), 1), to = round(max(D$value), 1), by = 0.05)), "%")) +
+  
+  scale_color_manual(values = c(blue, green)) +
+  
+  guides(color = guide_legend(override.aes = list(size = 30))) +
+  
+  geom_text(aes(y = value, label = paste0(round(100*value, 1), "%")), color = "grey31", family = "Trebuchet MS", size = txt_sz, vjust = "top") +
+  
+  theme(panel.background = x, text = f1, legend.title = x, axis.title = x, legend.key = x, legend.position = "top", axis.text.x = rotated_f1, axis.line.y = element_line(color = "grey31", size = 2), plot.title = title_style, panel.grid.major.y = grid_line)
+```
+
+## PET Distribution
+
+```{r petdist}
+edData %>%
+  mutate(
+    departmonth = as.Date(format(depart, "%Y-%m-01")),
+    regmonth = as.Date(format(reg, "%Y-%m-01"))
+  ) %>%
+  subset(complete.cases(depart) & departmonth == max(regmonth)) %>%
+  mutate(
+    pet = ifelse(
+      depart < reg,
+      NA,
+      as.numeric(
+        difftime(
+          depart,
+          reg,
+          units = "hours"
+        )
+      )
+    ),
+    petbin = ifelse(
+      floor(pet) == pet,
+      pet + 1,
+      ceiling(pet)
+    ),
+    count = 1
+  ) %>%
+  subset(complete.cases(pet)) %>%
+  group_by(petbin) %>%
+  mutate(count = sum(count)) %>%
+  ungroup() %>%
+  distinct(petbin, count, departmonth) %>%
+  arrange(petbin) %>%
+  mutate(
+    running = cumsum(count),
+    petrate = running/max(running)
+  ) -> D
+
+# subplot(
+# 
+#   D %>% subset(petbin < 25) %>%
+#     plot_ly(x = ~petbin) %>%
+#     add_trace(
+#       type = "scatter",
+#       mode = "lines+markers",
+#       y = ~petrate,
+#       marker = list(color = red, width = 15),
+#       line = list(color = red, width = 10)
+#     ) %>%
+#     add_annotations(
+#       data = D %>% subset(petbin %in% c(3, 6, 9, 12, 15, 18, 21, 24)),
+#       showarrow = FALSE,
+#       y = ~petrate,
+#       xanchor = "left",
+#       text = ~paste0(round(100*petrate, 1), "%")
+#     ) %>%
+#     add_annotations(
+#       data = D %>% subset(petbin == 6),
+#       y = ~petrate,
+#       ax = 600,
+#       ay = 450,
+#       text = ~paste(
+#         "6 Hour PET",
+#         paste0("Performance: ", round(100*petrate, 1), "%"),
+#         sep = "\n"
+#       )
+#     ) %>%
+#     add_annotations(
+#       data = D %>% subset(petbin == 9),
+#       y = ~petrate,
+#       ax = 1200,
+#       ay = 60,
+#       text = ~paste(
+#         "9 Hour PET",
+#         paste0("Performance: ", round(100*petrate, 1), "%"),
+#         sep = "\n"
+#       )
+#     ) %>%
+#     layout(
+#       yaxis = list(
+#         title = "Cumulative Fraction of Total Records",
+#         tickformat = "%"
+#       )
+#     ),
+#   
+#   D %>%
+#     subset(petbin < 25) %>%
+#     plot_ly(x = ~petbin, showlegend = FALSE) %>%
+#     add_bars(y = ~count, marker = list(color = blue)) %>%
+#     add_annotations(
+#       showarrow = FALSE,
+#       yanchor = ~ifelse(petbin < 10, "top", "bottom"),
+#       color = ~ifelse(petbin < 10, "white", "grey31"),
+#       y = ~count,
+#       textangle = 90,
+#       text = ~format(count, big.mark = ",")
+#     ) %>%
+#     layout(
+#       yaxis = list(
+#         title = "Number of records"
+#       )
+#     ),
+#   
+#   nrows = 2,
+#   shareX = TRUE,
+#   titleY = TRUE
+# ) %>%
+#   layout(
+#     xaxis = list(
+#       title = "PET (bin)",
+#       tickvals = c(0, 3, 6, 9, 12, 15, 18, 21, 24)
+#     ),
+#     margin = list(l = 5, t = 5, b = 5, r = 5),
+#     font = list(
+#       family = "Trebuchet MS",
+#       size = 80,
+#       color = "grey31"
+#     ))
+D %>% pull(departmonth) %>% unique() %>% format("%B %Y") -> sbttl
+
+D %>% subset(petbin <= 24) %>%
+  
+  ggplot(aes(x = petbin, y = petrate, label = ifelse(petbin %in% c(1,3,6,9,12,15,18,21,24), paste0(round(100*petrate, 1), "%"), ""))) + 
+  
+  geom_point(size = pnt_sz, color = red) + 
+  
+  geom_line(size = line_sz, color = red) + 
+  
+  geom_text(size = txt_sz, color = "grey31", family = "Trebuchet MS") +
+  
+  labs(title = "Count of Total ED Departures and % of Cumulative Total", subtitle = sbttl, x = NULL, y = "% of Cumulative Total") + 
+  
+  scale_y_continuous(labels = scales::percent, breaks = c(0,0.25,0.5,0.75,1)) +
+  
+  theme(plot.title = title_style, plot.subtitle = subtitle_style, panel.background = x, panel.grid.major.y = grid_line, axis.title.x = x, axis.title.y = f1, axis.line = x, axis.ticks = x, axis.text.y = f1, axis.text.x = x) -> p1
+
+D %>% subset(petbin <= 24) %>% 
+  
+  ggplot(aes(x = petbin, y = count)) + 
+  
+  geom_bar(stat = "identity", fill = blue) + 
+  
+  geom_text(mapping = aes(label = ifelse(count < 0.5*max(count), format(count, big.mark = ","), "")), angle = 90, family = "Trebuchet MS", size = txt_sz, hjust = "left", color = "grey31") + 
+  
+  geom_text(mapping = aes(label = ifelse(count < 0.5*max(count), "", format(count, big.mark = ","))), angle = 90, family = "Trebuchet MS", size = txt_sz, hjust = "right", color = "white") + 
+  
+  #scale_y_continuous(limits = c(0, 1.1*max(D$count))) + 
+  
+  scale_x_continuous(breaks = seq(1,24)) + 
+  
+  labs(x = "Number of Hours in ED", y = "Count of ED Departures") + 
+  
+  theme(plot.title = x, plot.subtitle = x, panel.background = x, axis.title = f1, axis.line = x, axis.ticks = x, axis.text = f1, panel.grid.major.y = grid_line) -> p2
+
+ggplotGrob(p1) -> g1; ggplotGrob(p2) -> g2
+rbind(g1, g2, size = "first") -> g
+grid.newpage()
+grid.draw(g)
+```
+
+
+## PET 6 & 9 Hour Performance By Hospital
+
+```{r pet69byhosp}
+edData %>%
+  mutate(
+    departmonth = as.Date(format(depart, "%Y-%m-01")),
+    regmonth = as.Date(format(reg, "%Y-%m-01"))
+  ) %>%
+  subset(departmonth == max(regmonth)) %>%
+  mutate(
+    pet = ifelse(
+      depart < reg,
+      NA,
+      as.numeric(
+        difftime(
+          depart,
+          reg,
+          units = "hours"
+        )
+      )
+    ),
+    count = 1,
+    pet6 = ifelse(pet < 6, 1, 0),
+    pet9 = ifelse(pet < 9, 1, 0)
+  ) %>%
+  subset(complete.cases(pet)) %>%
+  merge(
+    y = read.csv(
+      file = "~/provider_codes.csv",
+      stringsAsFactors = FALSE
+    ) %>%
+      select(hospital, biu_hospital_id),
+    by = "biu_hospital_id",
+    all.x = TRUE
+  ) %>%
+  group_by(hospital) %>%
+  mutate(
+    pet6 = mean(pet6),
+    pet9 = mean(pet9)
+  ) %>%
+  ungroup() %>%
+  select(departmonth, hospital, pet6, pet9) %>%
+  distinct() -> D
+
+D %>% pull(departmonth) %>% unique() %>% format("%B %Y") -> sbttl
+
+D %>% ggplot(aes(y = pet6, x = reorder(hospital, pet9), label = paste0(round(100*pet6, 1), "%"))) + 
+  
+  coord_flip() + 
+  
+  geom_bar(stat = "identity", fill = blue) + 
+  
+  geom_text(hjust = "right", family = "Trebuchet MS", color = "white", size = txt_sz) +
+  
+  scale_y_continuous(limits = c(0,1), labels = scales::percent) + 
+  
+  labs(title = "PET Performance By Hospital", subtitle = sbttl, y = "PET < 6 Hours", x = "") +
+  
+  theme(panel.background = x, panel.grid.major.x = grid_line, axis.line = x, axis.ticks = x, axis.text = f1, axis.title = f1, plot.title = title_style, plot.subtitle = subtitle_style) -> p1
+
+D %>% ggplot(aes(y = pet9, x = reorder(hospital, pet9), label = paste0(round(100*pet9, 1), "%"))) + 
+  
+  coord_flip() + 
+  
+  geom_bar(stat = "identity", fill = green) + 
+  
+  geom_text(hjust = "right", family = "Trebuchet MS", color = "white", size = txt_sz) +
+  
+  scale_y_continuous(limits = c(0,1), labels = scales::percent) + 
+  
+  labs(title = "PET Performance By Hospital", subtitle = sbttl, y = "PET < 9 Hours", x = "") +
+  
+  theme(panel.background = x, panel.grid.major.x = grid_line, axis.line = x, axis.ticks = x, axis.text.x = f1, axis.text.y = x, axis.title = f1, plot.title = x, plot.subtitle = x) -> p2
+
+ggplotGrob(p1) -> g1
+ggplotGrob(p2) -> g2
+cbind(g1, g2, size = "first") -> g
+grid.newpage()
+grid.draw(g)
+```
+
+## PET 6 & 9 Hour Performance By Hospital (Admitted)
+
+```{r admpet69byhosp}
+edData %>%
+  mutate(
+    departmonth = as.Date(format(depart, "%Y-%m-01")),
+    regmonth = as.Date(format(reg, "%Y-%m-01"))
+  ) %>%
+  subset(departmonth == max(regmonth) & destination %in% admDests) %>%
+  mutate(
+    pet = ifelse(
+      depart < reg,
+      NA,
+      as.numeric(
+        difftime(
+          depart,
+          reg,
+          units = "hours"
+        )
+      )
+    ),
+    count = 1,
+    pet6 = ifelse(pet < 6, 1, 0),
+    pet9 = ifelse(pet < 9, 1, 0)
+  ) %>%
+  subset(complete.cases(pet)) %>%
+  merge(
+    y = read.csv(
+      file = "~/provider_codes.csv",
+      stringsAsFactors = FALSE
+    ) %>%
+      select(hospital, biu_hospital_id),
+    by = "biu_hospital_id",
+    all.x = TRUE
+  ) %>%
+  group_by(hospital) %>%
+  mutate(
+    pet6 = mean(pet6),
+    pet9 = mean(pet9)
+  ) %>%
+  ungroup() %>%
+  select(hospital, pet6, pet9) %>%
+  distinct() -> D
+
+D %>% ggplot(aes(y = pet6, x = reorder(hospital, pet9), label = paste0(round(100*pet6, 1), "%"))) + 
+  
+  coord_flip() + 
+  
+  geom_bar(stat = "identity", fill = blue) + 
+  
+  geom_text(hjust = "right", family = "Trebuchet MS", color = "white", size = txt_sz) +
+  
+  scale_y_continuous(limits = c(0,1), labels = scales::percent) + 
+  
+  labs(title = "PET Performance By Hospital", subtitle = sbttl, y = "PET < 6 Hours", x = "") +
+  
+  theme(panel.background = x, panel.grid.major.x = grid_line, axis.line = x, axis.ticks = x, axis.text = f1, axis.title = f1, plot.title = title_style, plot.subtitle = subtitle_style) -> p1
+
+D %>% ggplot(aes(y = pet9, x = reorder(hospital, pet9), label = paste0(round(100*pet9, 1), "%"))) + 
+  
+  coord_flip() + 
+  
+  geom_bar(stat = "identity", fill = green) + 
+  
+  geom_text(hjust = "right", family = "Trebuchet MS", color = "white", size = txt_sz) +
+  
+  scale_y_continuous(limits = c(0,1), labels = scales::percent) + 
+  
+  labs(title = "PET Performance By Hospital", subtitle = paste0("Admissions | ", sbttl), y = "PET < 9 Hours", x = "") +
+  
+  theme(panel.background = x, panel.grid.major.x = grid_line, axis.line = x, axis.ticks = x, axis.text.x = f1, axis.text.y = x, axis.title = f1, plot.title = x, plot.subtitle = x) -> p2
+
+ggplotGrob(p1) -> g1
+ggplotGrob(p2) -> g2
+cbind(g1, g2, size = "first") -> g
+grid.newpage()
+grid.draw(g)
+```
+
+## PET 6 & 9 Hour Performance By Hospital (Not-Admitted)
+
+```{r nadmpet69byhosp}
+edData %>%
+  mutate(
+    departmonth = as.Date(format(depart, "%Y-%m-01")),
+    regmonth = as.Date(format(reg, "%Y-%m-01"))
+  ) %>%
+  subset(departmonth == max(regmonth) & !(destination %in% admDests)) %>%
+  mutate(
+    pet = ifelse(
+      depart < reg,
+      NA,
+      as.numeric(
+        difftime(
+          depart,
+          reg,
+          units = "hours"
+        )
+      )
+    ),
+    count = 1,
+    pet6 = ifelse(pet < 6, 1, 0),
+    pet9 = ifelse(pet < 9, 1, 0)
+  ) %>%
+  subset(complete.cases(pet)) %>%
+  merge(
+    y = read.csv(
+      file = "~/provider_codes.csv",
+      stringsAsFactors = FALSE
+    ) %>%
+      select(hospital, biu_hospital_id),
+    by = "biu_hospital_id",
+    all.x = TRUE
+  ) %>%
+  group_by(hospital) %>%
+  mutate(
+    pet6 = mean(pet6),
+    pet9 = mean(pet9)
+  ) %>%
+  ungroup() %>%
+  select(hospital, pet6, pet9) %>%
+  distinct() -> D
+
+D %>% ggplot(aes(y = pet6, x = reorder(hospital, pet9), label = paste0(round(100*pet6, 1), "%"))) + 
+  
+  coord_flip() + 
+  
+  geom_bar(stat = "identity", fill = blue) + 
+  
+  geom_text(hjust = "right", family = "Trebuchet MS", color = "white", size = txt_sz) +
+  
+  scale_y_continuous(limits = c(0,1), labels = scales::percent) + 
+  
+  labs(title = "PET Performance By Hospital", subtitle = sbttl, y = "PET < 6 Hours", x = "") +
+  
+  theme(panel.background = x, panel.grid.major.x = grid_line, axis.line = x, axis.ticks = x, axis.text = f1, axis.title = f1, plot.title = title_style, plot.subtitle = subtitle_style) -> p1
+
+D %>% ggplot(aes(y = pet9, x = reorder(hospital, pet9), label = paste0(round(100*pet9, 1), "%"))) + 
+  
+  coord_flip() + 
+  
+  geom_bar(stat = "identity", fill = green) + 
+  
+  geom_text(hjust = "right", family = "Trebuchet MS", color = "white", size = txt_sz) +
+  
+  scale_y_continuous(limits = c(0,1), labels = scales::percent) + 
+  
+  labs(title = "PET Performance By Hospital", subtitle = paste0("Non-Admissions | ", sbttl), y = "PET < 9 Hours", x = "") +
+  
+  theme(panel.background = x, panel.grid.major.x = grid_line, axis.line = x, axis.ticks = x, axis.text.x = f1, axis.text.y = x, axis.title = f1, plot.title = x, plot.subtitle = x) -> p2
+
+ggplotGrob(p1) -> g1
+ggplotGrob(p2) -> g2
+cbind(g1, g2, size = "first") -> g
+grid.newpage()
+grid.draw(g)
+```
+
+## PET >= 24 Hours
+
+```{r pet24tbl}
+edData %>%
+  mutate(
+    departmonth = as.Date(format(depart, "%Y-%m-01")),
+    regmonth = as.Date(format(reg, "%Y-%m-01"))
+  ) %>%
+  subset(departmonth == max(regmonth)) %>%
+  mutate(
+    pet = ifelse(
+      depart < reg,
+      NA,
+      as.numeric(
+        difftime(
+          depart,
+          reg,
+          units = "hours"
+        )
+      )
+    ),
+    count = 1,
+    petgt24 = ifelse(pet >= 24, 1, 0),
+    pet24 = 1 - petgt24
+  ) %>%
+  subset(complete.cases(pet)) %>%
+  merge(
+    y = read.csv(
+      file = "~/provider_codes.csv",
+      stringsAsFactors = FALSE
+    ) %>%
+      select(hospital, biu_hospital_id),
+    by = "biu_hospital_id",
+    all.x = TRUE
+  ) %>%
+  group_by(hospital) %>%
+  mutate(
+    departures = sum(count),
+    petgt24count = sum(petgt24),
+    pet24prob = mean(pet24)
+  ) %>%
+  ungroup() %>%
+  select(departmonth, hospital, departures, petgt24count, pet24prob) %>%
+  distinct() %>%
+  arrange(-pet24prob) -> pet24tbl
+
+pet24tbl %>% pull(departmonth) %>% unique() %>% format("%B %Y") -> sbttl
+
+pet24tbl %>% select(hospital, departures, petgt24count, pet24prob) %>%
+  rbind(data.frame(hospital = "<b>Total</b>",
+                   departures = sum(pet24tbl$departures),
+                   petgt24count = sum(pet24tbl$petgt24count),
+                   pet24prob = 1 - sum(pet24tbl$petgt24count)/sum(pet24tbl$departures))) %>% 
+  mutate(departures = format(departures, big.mark = ","),
+         petgt24count = format(petgt24count, big.mark = ","),
+         pet24prob = paste0(round(100*pet24prob, 1), "%"),
+         departures = ifelse(hospital == "<b>Total</b>", paste0("<b>", departures, "</b>"), departures),
+         petgt24count = ifelse(hospital == "<b>Total</b>", paste0("<b>", petgt24count, "</b>"), petgt24count),
+         pet24prob = ifelse(hospital == "<b>Total</b>", paste0("<b>", pet24prob, "</b>"), pet24prob),
+         petgt24count = gsub(" ", "", petgt24count),
+         departures = gsub(" ", "", departures)) -> D
+
+names(D) = c("<b>Hospital</b>", "<b>Departures</b>", "<b>PET &ge 24 Hours</b>", "<b>PET < 24 Hours</b>")
+
+D %>% plot_ly() %>%
+  add_table(
+    rownames = FALSE,
+    header = list(
+      height = 30,
+      values = c(paste0("<b>PET Greater Than 24 Hours</b><br><i>", sbttl, "</i><br> <br><b>Hospital</b>"), "<br><br><br><br><b>Departures</b>", "<br><br><br><br><b>PET >= 24 Hours</b>", "<br><br><br><br><b>PET < 24 Hours</b>"),
+      fill = list(color = "white"),
+      line = list(width = 0),
+      align = rep("left", 3)
+    ),
+    cells = list(
+      height = 30,
+      align = rep("left", 3),
+      line = list(width = 0),
+      fill = list(
+        color = list(
+          rep(
+            c(
+              rep("white", nrow(D)-1),
+              "white"
+            ),
+            3
+          )
+        )
+      )
+    )
+  ) %>%
+    layout(
+      font = list(
+        family = "Trebuchet MS",
+        size = 22,
+        color = "grey31"
+      ),
+      autosize = FALSE,
+      width = 1300,
+      height = 1100,
+      margin = list(t = 5, b = 5, l = 5, r = 5)
+    ) %>%
+    export(file = "petgt24tbl.png")
+```
+
+
+## PET >= 24 Hours (Ages 75+)
+
+```{r petgt24over75tbl}
+edData %>%
+  mutate(
+    departmonth = as.Date(format(depart, "%Y-%m-01")),
+    regmonth = as.Date(format(reg, "%Y-%m-01"))
+  ) %>%
+  subset(departmonth == max(regmonth) & complete.cases(age) & age >= 75 & age < 110) %>%
+  mutate(
+    pet = ifelse(
+      depart < reg,
+      NA,
+      as.numeric(
+        difftime(
+          depart,
+          reg,
+          units = "hours"
+        )
+      )
+    ),
+    count = 1,
+    petgt24 = ifelse(pet >= 24, 1, 0),
+    pet24 = 1 - petgt24
+  ) %>%
+  subset(complete.cases(pet)) %>%
+  merge(
+    y = read.csv(
+      file = "~/provider_codes.csv",
+      stringsAsFactors = FALSE
+    ) %>%
+      select(hospital, biu_hospital_id),
+    by = "biu_hospital_id",
+    all.x = TRUE
+  ) %>%
+  group_by(hospital) %>%
+  mutate(
+    departures = sum(count),
+    petgt24count = sum(petgt24),
+    pet24prob = mean(pet24)
+  ) %>%
+  ungroup() %>%
+  select(departmonth, hospital, departures, petgt24count, pet24prob) %>%
+  distinct() %>%
+  arrange(-pet24prob) -> pet24tbl
+
+pet24tbl %>% pull(departmonth) %>% unique() %>% format("%B %Y") -> sbttl
+
+pet24tbl %>% select(hospital, departures, petgt24count, pet24prob) %>%
+  rbind(data.frame(hospital = "<b>Total</b>",
+                   departures = sum(pet24tbl$departures),
+                   petgt24count = sum(pet24tbl$petgt24count),
+                   pet24prob = 1 - sum(pet24tbl$petgt24count)/sum(pet24tbl$departures))) %>% 
+  mutate(departures = format(departures, big.mark = ","),
+         petgt24count = format(petgt24count, big.mark = ","),
+         pet24prob = paste0(round(100*pet24prob, 1), "%"),
+         departures = ifelse(hospital == "<b>Total</b>", paste0("<b>", departures, "</b>"), departures),
+         petgt24count = ifelse(hospital == "<b>Total</b>", paste0("<b>", petgt24count, "</b>"), petgt24count),
+         pet24prob = ifelse(hospital == "<b>Total</b>", paste0("<b>", pet24prob, "</b>"), pet24prob),
+         petgt24count = gsub(" ", "", petgt24count),
+         departures = gsub(" ", "", departures)) -> D
+
+names(D) = c("<b>Hospital</b>", "<b>Departures</b>", "<b>PET &ge 24 Hours</b>", "<b>PET < 24 Hours</b>")
+
+D %>% plot_ly() %>%
+  add_table(
+    rownames = FALSE,
+    header = list(
+      height = 30,
+      values = c(paste0("<b>PET Greater Than 24 Hours</b><br><i>Ages 75+ | ", sbttl, "</i><br> <br><b>Hospital</b>"), "<br><br><br><br><b>Departures</b>", "<br><br><br><br><b>PET >= 24 Hours</b>", "<br><br><br><br><b>PET < 24 Hours</b>"),
+      fill = list(color = "white"),
+      line = list(width = 0),
+      align = rep("left", 3)
+    ),
+    cells = list(
+      height = 30,
+      align = rep("left", 3),
+      line = list(width = 0),
+      fill = list(
+        color = list(
+          rep(
+            c(
+              rep("white", nrow(D)-1),
+              "white"
+            ),
+            3
+          )
+        )
+      )
+    )
+  ) %>%
+    layout(
+      font = list(
+        family = "Trebuchet MS",
+        size = 22,
+        color = "grey31"
+      ),
+      autosize = FALSE,
+      width = 1300,
+      height = 1100,
+      margin = list(t = 5, b = 5, l = 5, r = 5)
+    ) %>%
+    export(file = "petgt24over75tbl.png")
+```
+
+# Trolleys
+
+## Trolleys Month & YTD
+
+```{r trolleytbl, eval = FALSE}
+read.csv(file = "C:/Users/jack.lyons/Downloads/TrolleyGAR.csv",
+         stringsAsFactors = FALSE) %>%
+  select(Hospital.Code, Target.Date, Total.8am) %>%
+  rename(biu_hospital_id = Hospital.Code, 
+         date = Target.Date, 
+         total8am = Total.8am) %>%
+  mutate(date = as.Date.character(date, "%d/%m/%Y"),
+         year = as.integer(format(date, "%Y")),
+         month = as.integer(format(date, "%m")),
+         year1 = ifelse(year == max(year), total8am, 0),
+         year0 = ifelse(year == max(year) - 1, total8am, 0)) %>%
+  subset(year >= max(year) - 1 & !(biu_hospital_id %in% c(940, 941, 992))) %>%
+  group_by(biu_hospital_id, month) %>%
+  mutate(year1 = sum(year1),
+         year0 = sum(year0),
+         thisyear = max(year)) %>%
+  ungroup() %>%
+  select(biu_hospital_id, thisyear, month, year0, year1) %>%
+  distinct() %>%
+  arrange(biu_hospital_id, month) %>%
+  group_by(biu_hospital_id) %>%
+  mutate(ytdyear0 = cumsum(year0),
+         ytdyear1 = cumsum(year1)) %>%
+  ungroup() %>%
+  subset(year1 != 0) %>%
+  subset(month == max(month)) %>%
+  merge(y = read.csv(file = "~/provider_codes.csv",
+                     stringsAsFactors = FALSE) %>% select(
+                       biu_hospital_id, 
+                       hospital_group_long_name,
+                       hospital
+                      ),
+        by = "biu_hospital_id",
+        all.x = TRUE) %>%
+  arrange(
+    hospital_group_long_name, 
+    hospital
+  ) -> trolleystbl
+
+trolleystbl %>% rbind(data.frame(biu_hospital_id = 9999,
+                                 thisyear = max(trolleystbl$thisyear),
+                                 month = max(trolleystbl$month),
+                                 year0 = sum(trolleystbl$year0),
+                                 year1 = sum(trolleystbl$year1),
+                                 ytdyear0 = sum(trolleystbl$ytdyear0),
+                                 ytdyear1 = sum(trolleystbl$ytdyear1),
+                                 hospital_group_long_name = "Total",
+                                 hospital = "")) %>%
+  mutate(change = ifelse(year0 == 0, NA, (year1 - year0)/year0),
+         ytdchange = ifelse(ytdyear0 == 0, NA, (ytdyear1 - ytdyear0)/ytdyear0),
+         change = ifelse(
+           is.na(change), "",
+           ifelse(
+             change < 0,
+             paste0(round(100*change, 1), "%"),
+             paste0("+", round(100*change, 1), "%")
+           )
+         ),
+         ytdchange = ifelse(
+           is.na(ytdchange), "",
+           ifelse(
+             ytdchange < 0,
+             paste0(round(100*ytdchange, 1), "%"),
+             paste0("+", round(100*ytdchange, 1), "%")
+           )
+         )
+  ) -> trolleystbl
+
+for(c in c("year0", "year1", "ytdyear0", "ytdyear1")){
+  trolleystbl[, c] = format(trolleystbl[, c], big.mark = ",")
+}
+
+YYYY1 = trolleystbl %>% pull(thisyear) %>% unique()
+YYYY0 = YYYY1 - 1
+
+MMMM = paste(
+  YYYY1,
+  trolleystbl %>% pull(month) %>% unique(),
+  1,
+  sep = "-"
+) %>% 
+  as.Date() %>%
+  format("%B")
+
+trolleystbl %>%
+  mutate(
+    gap1 = "", 
+    gap2 = "",
+    hospital_group_long_name = ifelse(
+      duplicated(hospital_group_long_name),
+      "",
+      hospital_group_long_name
+    )
+  ) %>%
+  select(
+    hospital_group_long_name, 
+    hospital, 
+    year0, 
+    year1, 
+    gap1, 
+    ytdyear0, 
+    ytdyear1, 
+    gap2, 
+    change, 
+    ytdchange
+  ) %>%
+  plot_ly() %>% 
+  add_table(
+    rownames = FALSE,
+    columnwidth = c(4, 2, 1, 1, 1, 1, 1, 1, 1, 1),
+    header = list(
+      height = 30,
+      values = c(
+        "", 
+        "",
+        paste(MMMM, YYYY0, sep = "<br>"),
+        paste0(MMMM, "<br>", YYYY0, " YTD"),
+        "", 
+        paste(MMMM, YYYY1, sep = "<br>"), 
+        paste0(MMMM, "<br>", YYYY1, " YTD"), 
+        "", 
+        "% Change<br>Month", 
+        "% Change<br>YTD"
+      ),
+      align = c("left", "left", rep("center", 8)),
+      line = list(width = 0),
+      fill = list(
+        color = c(
+          "skyblue", "skyblue", "skyblue", "skyblue",
+          "white", 
+          "skyblue", "skyblue", 
+          "white",  
+          "skyblue", "skyblue"
+        )
+      )
+    ),
+    cells = list(
+      height = 25,
+      align = c("left", "left", rep("center", 8)),
+      line = list(width = 0),
+      fill = list(
+        color = list(
+          c(rep("white", nrow(trolleystbl)-1), "skyblue"),
+          c(rep("white", nrow(trolleystbl)-1), "skyblue"),
+          c(rep("white", nrow(trolleystbl)-1), "skyblue"),
+          c(rep("white", nrow(trolleystbl)-1), "skyblue"),
+          "white",
+          c(rep("white", nrow(trolleystbl)-1), "skyblue"),
+          c(rep("white", nrow(trolleystbl)-1), "skyblue"),
+          "white",
+          c(rep("white", nrow(trolleystbl)-1), "skyblue"),
+          c(rep("white", nrow(trolleystbl)-1), "skyblue")
+        )
+      )
+    )
+  ) %>%
+  layout(
+    font = list(
+      family = "Trebuchet MS",
+      size = 16,
+      color = "grey31"
+    ),
+    autosize = FALSE,
+    width = 1300,
+    height = 975,
+    margin = list(t = 5, b = 5, r = 5, l = 5)
+  ) %>% export(
+    file = "trolleytbl.png"
+  )
+```
+
+
+## 30-Day Moving Average (Year on Year Comparison)
+
+```{r trolleys30dmavYvY}
+read.csv(
+  file = "C:/Users/jack.lyons/Downloads/TrolleyGAR.csv",
+  stringsAsFactors = FALSE
+) %>%
+  select(Hospital.Code, Target.Date, Total.8am) %>%
+  rename(
+    biu_hospital_id = Hospital.Code, 
+    date = Target.Date,
+    total = Total.8am
+  ) %>%
+  mutate(
+    date = as.Date.character(date, "%d/%m/%Y"),
+    year = as.integer(format(date, "%Y")),
+    monthNumber = as.integer(format(date, "%m")),
+    thisyear = max(year)
+  ) %>%
+  subset(date >= as.Date("2017-12-01")) %>%
+  group_by(date) %>%
+  mutate(total = sum(total)) %>%
+  ungroup() %>%
+  select(year, date, total) %>%
+  distinct() %>%
+  arrange(date) %>%
+  mutate(
+    mav30 = 0,
+    chartDate = as.Date(
+      paste(
+        max(year), 
+        format(date, "%m-%d"),
+        sep = "-"
+      )
+    )
+  ) %>%
+  data.frame() -> D
+
+for(r in 2:nrow(D)){
+  D[r, "mav30"] = subset(
+    D,
+    date %in% seq.Date(
+      from = D[r, "date"] - 30,
+      to = D[r, "date"],
+      by = "days"
+    )
+  ) %>% 
+    pull(total) %>%
+    mean()
+}
+
+seq.Date(from = min(D$chartDate), to = max(D$chartDate), by = "month") -> xbreaks
+format(xbreaks, "%B") -> xlabels
+
+D %>% 
+  
+  subset(year >= max(year)-2) %>%
+  
+  ggplot(aes(x = chartDate, y = mav30, color = factor(year))) +
+  
+  geom_line(size = line_sz, key_glyph = "rect") +
+  
+  scale_color_manual(values = c(red, blue, green)) +
+  
+  scale_x_date(breaks = xbreaks, labels = xlabels) +
+  
+  labs(title = "30-Day Moving Average of Trolley Count") +
+  
+  theme(panel.background = x, axis.title = x, legend.title = x, legend.key = x, legend.position = "top", legend.direction = "horizontal", axis.line = element_line(size = 1, color = "grey31"), text=  f1, axis.text.x = rotated_f1, panel.grid.major = grid_line) + legendFixColor
+```
+
+## 30-Day Moving Average
+
+```{r trolleys30dmav}
+seq.Date(from = min(D$date), to = max(D$date), by = "month") -> xbreaks
+format(xbreaks, "%b %Y") -> xlabels
+
+D %>% 
+  
+  subset(year >= max(year)-2) %>%
+  
+  ggplot(aes(x = date, y = mav30, color = factor(year))) +
+  
+  geom_line(size = line_sz, key_glyph = "rect") +
+  
+  scale_color_manual(values = c(red, blue, green)) +
+  
+  scale_x_date(breaks = xbreaks, labels = xlabels) +
+  
+  labs(title = "30-Day Moving Average of Trolley Count") +
+  
+  theme(panel.background = x, axis.title = x, legend.title = x, legend.key = x, legend.position = "top", legend.direction = "horizontal", axis.line = element_line(size = 1, color = "grey31"), text=  f1, axis.text.x = rotated_f1, panel.grid.major = grid_line) + legendFixColor
+```
+
+## Monthly Trolley Count by Hospital
+
+```{r trolleycountbyhosp}
+read.csv(
+  file = "C:/Users/jack.lyons/Downloads/TrolleyGAR.csv",
+  stringsAsFactors = FALSE
+) %>%
+  select(Hospital.Code, Target.Date, Total.8am) %>%
+  rename(
+    biu_hospital_id = Hospital.Code, 
+    date = Target.Date,
+    total = Total.8am
+  ) %>%
+  mutate(
+    date = as.Date.character(date, "%d/%m/%Y"),
+    year = as.integer(format(date, "%Y")),
+    month = as.Date(format(date, "%Y-%m-01")),
+    monthNumber = as.integer(format(date, "%m"))
+  ) %>%
+  subset(month == max(month)) %>%
+  merge(
+    y = read.csv(
+      file = "~/provider_codes.csv",
+      stringsAsFactors = FALSE
+    ) %>% select(biu_hospital_id, hospital),
+    by = "biu_hospital_id",
+    all.x = TRUE
+  ) %>%
+  group_by(hospital) %>%
+  mutate(sum = sum(total)) %>%
+  ungroup() %>%
+  select(month, hospital, sum) %>%
+  distinct() -> D
+
+D %>% ggplot(aes(x = reorder(hospital, sum), y = sum)) + geom_bar(stat = "identity", aes(fill = sum)) + coord_flip() + geom_text(aes(label = format(sum, big.mark = ",")), hjust = "left", size = txt_sz, family = "Trebuchet MS", color = "grey31") + theme(axis.title = x, axis.ticks = x, axis.line = x, axis.text = f1, plot.title = title_style, plot.subtitle = subtitle_style, panel.background = x, panel.grid.major.x = grid_line) + guides(fill = "none") + labs(title = "Total Daily Trolley Count", subtitle = D %>% pull(month) %>% unique() %>% format("%B %Y")) + scale_fill_gradient(high = "darkred", low = "pink") + scale_y_continuous(limits = c(0, 1.05*max(D$sum)))
+```
+
+## % Contribution to Trolley Count
+
+```{r trolleycontrib}
+read.csv(file = "C:/Users/jack.lyons/Downloads/TrolleyGAR.csv",
+         stringsAsFactors = FALSE) %>%
+  select(Hospital.Code, Target.Date, Total.8am) %>%
+  rename(biu_hospital_id = Hospital.Code, 
+         date = Target.Date, 
+         total8am = Total.8am) %>%
+  mutate(date = as.Date.character(date, "%d/%m/%Y"),
+         year = as.integer(format(date, "%Y")),
+         month = as.integer(format(date, "%m")),
+         year1 = ifelse(year == max(year), total8am, 0),
+         year0 = ifelse(year == max(year) - 1, total8am, 0)) %>%
+  subset(year >= max(year) - 1) %>%
+  group_by(biu_hospital_id, month) %>%
+  mutate(year1 = sum(year1),
+         year0 = sum(year0),
+         thisyear = max(year)) %>%
+  ungroup() %>%
+  select(biu_hospital_id, thisyear, month, year0, year1) %>%
+  distinct() %>%
+  subset(year1 != 0) %>%
+  subset(month == max(month)) %>%
+  merge(y = read.csv(file = "~/provider_codes.csv",
+                     stringsAsFactors = FALSE) %>% select(biu_hospital_id, hospital),
+        by = "biu_hospital_id",
+        all.x = TRUE) %>%
+  select(hospital, thisyear, month, year0, year1) %>%
+  mutate(year0contrib = year0/sum(year0),
+         year1contrib = year1/sum(year1),
+         year0lbl = paste0(round(100*year0contrib, 1), "%"),
+         year1lbl = paste0(round(100*year1contrib, 1), "%")) %>%
+  arrange(hospital) -> D
+
+YYYY1 = D %>% pull(thisyear) %>% unique()
+YYYY0 = YYYY1 - 1
+
+D %>% mutate(t = format(as.Date(paste(thisyear-1, month, 1, sep = "-")), "%B %Y")) %>% pull(t) %>% unique() -> xt0
+D %>% mutate(t = format(as.Date(paste(thisyear, month, 1, sep = "-")), "%B %Y")) %>% pull(t) %>% unique() -> xt1
+
+D %>% ggplot(aes(x = reorder(hospital, year1contrib), y = year0contrib, label = year0lbl)) + 
+  
+  coord_flip() + 
+  
+  geom_bar(stat = "identity", fill = green) + 
+  
+  geom_text(color = "grey31", hjust = "left", size = txt_sz, family = "Trebuchet MS") + 
+  
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1.05*max(D$year0contrib))) + 
+  
+  theme(axis.ticks = x, axis.title.y = x, panel.background = x, panel.grid.major.x = grid_line, axis.text = f1, axis.title.x = f1) +
+  
+  labs(y = xt0) -> p1
+
+D %>% ggplot(aes(x = reorder(hospital, year1contrib), y = year1contrib, label = year1lbl)) + 
+  
+  coord_flip() + 
+  
+  geom_bar(stat = "identity", fill = blue) + 
+  
+  geom_text(color = "grey31", hjust = "left", size = txt_sz,  family = "Trebuchet MS") + 
+  
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1.05*max(D$year1contrib))) + 
+  
+  theme(axis.text.y = x, axis.text.x = f1, axis.title.y = x, axis.title.x = f1, axis.ticks = x, panel.background = x, panel.grid.major.x = grid_line) + 
+  
+  labs(y = xt1) -> p2
+
+
+g1 = ggplotGrob(p1); g2 = ggplotGrob(p2)
+cbind(g1, g2, size = "first") -> g
+grid.newpage()
+grid.draw(g)
+# subplot(
+# 
+#   tbl %>% plot_ly(
+#     type = "bar",
+#     x = ~year0contrib,
+#     y = ~reorder(hospital, year1contrib),
+#     marker = list(color = green)
+#   ) %>% add_annotations(
+#     showarrow = FALSE,
+#     xanchor = "left",
+#     text = ~paste0(round(100*year0contrib, 1), "%")
+#   ) %>%
+#     layout(
+#       xaxis = list(
+#         title = paste("Contribution to", YYYY0, "Total"),
+#         tickformat = "%"
+#       )
+#     ),
+#   tbl %>% plot_ly(
+#     showlegend = FALSE,
+#     type = "bar",
+#     x = ~year1contrib,
+#     y = ~reorder(hospital, year1contrib),
+#     marker = list(color = blue)
+#   ) %>% add_annotations(
+#     showarrow = FALSE,
+#     xanchor = "left",
+#     text = ~paste0(round(100*year1contrib, 1), "%")
+#   ) %>%
+#     layout(
+#       xaxis = list(
+#         title = paste("Contribution to", YYYY1, "Total"),
+#         tickformat = "%"
+#       )
+#     ),
+#   nrows = 1,
+#   shareY = TRUE,
+#   titleX = TRUE
+# ) %>%
+#   layout(
+#     yaxis = list(
+#       title = "",
+#       autotick = FALSE
+#     ),
+#     font = list(
+#       family = "Trebuchet MS",
+#       size = 80,
+#       colour = "grey31"
+#     ),
+#     yaxis = list(
+#     margin = list(t = 5, b = 5, r = 5, l = 5)
+#     )
+#   )
+```
+
+## Change in YTD Trolley Count
+
+```{r changeytdtrolleys, eval=FALSE}
+read.csv(file = "C:/Users/jack.lyons/Downloads/TrolleyGAR.csv",
+         stringsAsFactors = FALSE) %>%
+  select(Hospital.Code, Target.Date, Total.8am) %>%
+  rename(biu_hospital_id = Hospital.Code, 
+         date = Target.Date, 
+         total8am = Total.8am) %>%
+  mutate(date = as.Date.character(date, "%d/%m/%Y"),
+         year = as.integer(format(date, "%Y")),
+         month = as.integer(format(date, "%m")),
+         year1 = ifelse(year == max(year), total8am, 0),
+         year0 = ifelse(year == max(year) - 1, total8am, 0)) %>%
+  subset(year >= max(year) - 1) %>%
+  group_by(biu_hospital_id, month) %>%
+  mutate(year1 = sum(year1),
+         year0 = sum(year0),
+         thisyear = max(year)) %>%
+  ungroup() %>%
+  select(biu_hospital_id, thisyear, month, year0, year1) %>%
+  distinct() %>%
+  arrange(biu_hospital_id, month) %>%
+  group_by(biu_hospital_id) %>%
+  mutate(ytdyear0 = cumsum(year0),
+         ytdyear1 = cumsum(year1)) %>%
+  ungroup() %>%
+  subset(year1 != 0) %>%
+  subset(month == max(month)) %>%
+  merge(y = read.csv(file = "~/provider_codes.csv",
+                     stringsAsFactors = FALSE) %>% select(biu_hospital_id, hospital),
+        by = "biu_hospital_id",
+        all.x = TRUE) %>%
+  arrange(hospital) %>%
+  mutate(ytdchange = ytdyear1 - ytdyear0,
+         ytdchangepc = ifelse(ytdyear0 == 0, NA, ytdchange/ytdyear0),
+         ytdchangepclabel = ifelse(is.na(ytdchangepc), "",
+                                   ifelse(ytdchangepc < 0, 
+                                          paste0(round(100*ytdchangepc, 1), "%"), 
+                                          paste0("+", round(100*ytdchangepc, 1), "%"))),
+         ytdchangelabel = ifelse(ytdchange < 0, 
+                                 format(ytdchange, big.mark = ","),
+                                 paste0("+", ytdchange)))-> tbl
+
+YYYY1 = tbl %>% pull(thisyear) %>% unique()
+YYYY0 = YYYY1 - 1
+
+MMMM = paste(
+  YYYY1,
+  tbl %>% pull(month) %>% unique(),
+  1,
+  sep = "-"
+) %>% 
+  as.Date() %>%
+  format("%B")
+
+tbl %>% plot_ly(
+  type = "bar",
+  x = ~ytdchange,
+  y = ~reorder(hospital, ytdchange),
+  marker = ~list(color = ifelse(ytdchange < 0, green, red))
+) %>% add_annotations(
+  showarrow = FALSE,
+  text = ~ytdchangelabel,
+  xanchor = ~ifelse(ytdchange < 0, "right", "left")
+) %>% layout(
+  yaxis = list(
+    title = "",
+    autotick = FALSE
+  ),
+  xaxis = list(
+    title = "Change in YTD Total Trolleys"
+  ),
+  font = list(
+    family = "Trebuchet MS",
+    size = 80,
+    colour = "grey31"
+  ),
+  margin = list(t = 5, b = 5, r = 5, l = 5)
+)
+```
+
+```{r changeytdtrolleys2}
+read.csv(file = "C:/Users/jack.lyons/Downloads/TrolleyGAR.csv",
+         stringsAsFactors = FALSE) %>%
+  select(Hospital.Code, Target.Date, Total.8am) %>%
+  rename(biu_hospital_id = Hospital.Code, 
+         date = Target.Date, 
+         total8am = Total.8am) %>%
+  mutate(date = as.Date.character(date, "%d/%m/%Y"),
+         year = as.integer(format(date, "%Y")),
+         month = as.integer(format(date, "%m")),
+         year1 = ifelse(year == max(year), total8am, 0),
+         year0 = ifelse(year == max(year) - 1, total8am, 0)) %>%
+  subset(year >= max(year) - 1) %>%
+  group_by(biu_hospital_id, month) %>%
+  mutate(year1 = sum(year1),
+         year0 = sum(year0),
+         thisyear = max(year)) %>%
+  ungroup() %>%
+  select(biu_hospital_id, thisyear, month, year0, year1) %>%
+  distinct() %>%
+  arrange(biu_hospital_id, month) %>%
+  group_by(biu_hospital_id) %>%
+  mutate(ytdyear0 = cumsum(year0),
+         ytdyear1 = cumsum(year1)) %>%
+  ungroup() %>%
+  subset(year1 != 0) %>%
+  subset(month == max(month)) %>%
+  merge(y = read.csv(file = "~/provider_codes.csv",
+                     stringsAsFactors = FALSE) %>% select(biu_hospital_id, hospital),
+        by = "biu_hospital_id",
+        all.x = TRUE) %>%
+  arrange(hospital) %>%
+  mutate(ytdchange = ytdyear1 - ytdyear0,
+         ytdchangepc = ifelse(ytdyear0 == 0, NA, ytdchange/ytdyear0),
+         ytdchangepclabel = ifelse(is.na(ytdchangepc), "",
+                                   ifelse(ytdchangepc < 0, 
+                                          paste0(round(100*ytdchangepc, 1), "%"), 
+                                          paste0("+", round(100*ytdchangepc, 1), "%"))),
+         ytdchangelabel = ifelse(ytdchange < 0, 
+                                 format(ytdchange, big.mark = ","),
+                                 paste0("+", ytdchange)),
+         increase = ifelse(ytdchange > 0, "A", "B"))-> D
+
+YYYY1 = D %>% pull(thisyear) %>% unique() %>% as.integer()
+YYYY0 = YYYY1 - 1
+
+MMMM = paste(
+  YYYY1,
+  D %>% pull(month) %>% unique(),
+  1,
+  sep = "-"
+) %>% 
+  as.Date() %>%
+  format("%B")
+
+D %>% ggplot(aes(x = reorder(hospital, ytdchange), y = ytdchange, label = ytdchangelabel, fill = increase)) + geom_bar(stat = "identity") + coord_flip() + geom_text(color = "grey31", hjust = ifelse(D$ytdchange >= 0, "left", "right"), family = "Trebuchet MS", size = txt_sz) + scale_fill_manual(values = c(red, green)) + guides(fill = "none") + labs(title = "Change in YTD Trolley Count", subtitle = YYYY1) + theme(panel.background = x, axis.title = x, axis.ticks = x, plot.title = title_style, plot.subtitle = subtitle_style, axis.text = f1, panel.grid.major.x = grid_line)
+```
+
+## % Change in YTD Trolley Count
+
+```{r pcchangeytdtrolleys, eval=FALSE}
+read.csv(file = "C:/Users/jack.lyons/Downloads/TrolleyGAR.csv",
+         stringsAsFactors = FALSE) %>%
+  select(Hospital.Code, Target.Date, Total.8am) %>%
+  rename(biu_hospital_id = Hospital.Code, 
+         date = Target.Date, 
+         total8am = Total.8am) %>%
+  mutate(date = as.Date.character(date, "%d/%m/%Y"),
+         year = as.integer(format(date, "%Y")),
+         month = as.integer(format(date, "%m")),
+         year1 = ifelse(year == max(year), total8am, 0),
+         year0 = ifelse(year == max(year) - 1, total8am, 0)) %>%
+  subset(year >= max(year) - 1) %>%
+  group_by(biu_hospital_id, month) %>%
+  mutate(year1 = sum(year1),
+         year0 = sum(year0),
+         thisyear = max(year)) %>%
+  ungroup() %>%
+  select(biu_hospital_id, thisyear, month, year0, year1) %>%
+  distinct() %>%
+  arrange(biu_hospital_id, month) %>%
+  group_by(biu_hospital_id) %>%
+  mutate(ytdyear0 = cumsum(year0),
+         ytdyear1 = cumsum(year1)) %>%
+  ungroup() %>%
+  subset(year1 != 0) %>%
+  subset(month == max(month)) %>%
+  merge(y = read.csv(file = "~/provider_codes.csv",
+                     stringsAsFactors = FALSE) %>% select(biu_hospital_id, hospital),
+        by = "biu_hospital_id",
+        all.x = TRUE) %>%
+  arrange(hospital) %>%
+  mutate(ytdchange = ytdyear1 - ytdyear0,
+         ytdchangepc = ifelse(ytdyear0 == 0, NA, ytdchange/ytdyear0),
+         ytdchangepclabel = ifelse(is.na(ytdchangepc), "",
+                                   ifelse(ytdchangepc < 0, 
+                                          paste0(round(100*ytdchangepc, 1), "%"), 
+                                          paste0("+", round(100*ytdchangepc, 1), "%"))),
+         ytdchangelabel = ifelse(ytdchange < 0, 
+                                 format(ytdchange, big.mark = ","),
+                                 paste0("+", ytdchange)))-> tbl
+
+YYYY1 = tbl %>% pull(thisyear) %>% unique()
+YYYY0 = YYYY1 - 1
+
+MMMM = paste(
+  YYYY1,
+  tbl %>% pull(month) %>% unique(),
+  1,
+  sep = "-"
+) %>% 
+  as.Date() %>%
+  format("%B")
+
+tbl %>% plot_ly(
+  type = "bar",
+  x = ~ytdchangepc,
+  y = ~reorder(hospital, ytdchangepc),
+  marker = ~list(color = ifelse(ytdchange < 0, green, red))
+) %>% add_annotations(
+  showarrow = FALSE,
+  text = ~ytdchangepclabel,
+  xanchor = ~ifelse(ytdchange < 0, "right", "left")
+) %>% layout(
+  yaxis = list(
+    title = "",
+    autotick = FALSE
+  ),
+  xaxis = list(
+    title = "% Change in YTD Total Trolleys",
+    tickformat = "%"
+  ),
+  font = list(
+    family = "Trebuchet MS",
+    size = 80,
+    colour = "grey31"
+  ),
+  margin = list(t = 5, b = 5, r = 5, l = 5)
+)
+```
+
+```{r pcchangeytdtrolleys2}
+D %>% ggplot(aes(x = reorder(hospital, ytdchangepc), y = ytdchangepc, label = ytdchangepclabel, fill = increase)) + geom_bar(stat = "identity") + coord_flip() + geom_text(color = "grey31", size = txt_sz, family = "Trebuchet MS", hjust = ifelse(D$ytdchangepc >= 0, "left", "right")) + scale_fill_manual(values = c(red, green)) + guides(fill = "none") + labs(title = "% Change in YTD Trolley Count", subtitle = YYYY1) + theme(panel.background = x, axis.title = x, axis.ticks = x, plot.title = title_style, plot.subtitle = subtitle_style, axis.text = f1, panel.grid.major.x = grid_line)
+```
+
+```{r cleanup}
+rm(list = ls())
+```
