@@ -1,0 +1,928 @@
+---
+title: "National Acute Hospital Review"
+subtitle: "Inpatients & Outpatients"
+date: "March 2020"
+output:
+  powerpoint_presentation:
+    reference_doc: myStyle.pptx
+---
+
+```{r setup, echo=FALSE, warning=FALSE, message=FALSE, eval=TRUE}
+library(dplyr)
+library(tidyr)
+library(plotly)
+library(reshape2)
+library(extrafont)
+library(scales)
+library(grid)
+library(gtable)
+
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, error = FALSE, message = FALSE, fig.height = 45, fig.width = 85, eval=TRUE)
+
+
+read.csv(file = "~/MyColors.csv", stringsAsFactors = FALSE) %>% 
+  
+  subset(color == "blue") %>% pull(code) -> blue
+
+read.csv(file = "~/MyColors.csv", stringsAsFactors = FALSE) %>% 
+  
+  subset(color == "red") %>% pull(code) -> red
+
+read.csv(file = "~/MyColors.csv", stringsAsFactors = FALSE) %>% 
+  
+  subset(color == "green") %>% pull(code) -> green
+
+read.csv(file = "~/MyColors.csv", stringsAsFactors = FALSE) %>% 
+  
+  subset(color == "orange") %>% pull(code) -> orange
+
+read.csv(file = "~/MyColors.csv", stringsAsFactors = FALSE) %>% 
+  
+  subset(color == "lightblue") %>% pull(code) -> lightblue
+
+x = element_blank()
+f1 = element_text(family = "Trebuchet MS", color = "grey31", size = 100)
+f2 = element_text(family = "Trebuchet MS", color = "grey31", size = 100, angle = 90, hjust = 1, vjust = 0)
+txt_sz = 30
+line_sz = 5
+pnt_sz = 10
+
+grid_line = element_line(size = 2, color = "grey50")
+title_style = element_text(family = "Trebuchet MS", color = "grey31", size = 110, vjust = 1, face = "bold")
+subtitle_style = element_text(family = "Trebuchet MS", color = "grey31", size = 100, face = "italic")
+
+```
+
+## Contents
+
+```{r toc}
+data.frame(section = c("Executive Summary", "Inpatient & Day-case Discharges", "Average Length of Stay", "Day of Surgery Admission %", "Re-Admission %", "Outpatient Waiting List", "Outpatient Attendances & Referrals"), slidenumber = c(3, 4, 11, 18, 20, 23, 31)) %>% 
+  
+  plot_ly() %>% 
+  
+  add_table(
+  rownames = FALSE,
+  header = list(
+    values = c("Section", "Slide No."),
+    height = 60,
+    align = list("left", "right"),
+    line = list(width = 0),
+    fill = list(color = "skyblue")
+  ),
+  cells = list(
+    height = 50,
+    align = list("left", "right"),
+    line = list(width = 0)
+  )
+) %>% 
+  
+  layout(
+  font = list(
+    family = "Trebuchet MS",
+    size = 25,
+    colour = "grey31"
+  ),
+  autosize = FALSE,
+  width = 1300,
+  height = 975,
+  margin = list(t = 5, b = 5, r = 5, l = 5)
+) %>% 
+  
+  export(file = "toc.png")
+```
+
+## Executive Summary
+
+```{r summary, eval=FALSE}
+read.csv(file = "C:/Users/jack.lyons/Downloads/NQAIS Spreadsheet.csv",stringsAsFactors = FALSE) %>% mutate(date = as.Date(date), year = as.integer(format(date, "%Y")), month = format(date, "%B"), monthnumber = as.integer(format(date, "%m"))) -> D
+
+D %>% subset(date == max(date)) %>% pull(year) %>% max() -> Y
+
+D %>% subset(date == max(date)) %>% pull(month) %>% unique() -> M
+
+D %>% subset(date == max(date)) %>% pull(monthnumber) %>% unique() -> m
+
+D %>% subset(discipline == "Surgical" & year == Y & month == M) %>% pull(in_patients) %>% sum() -> surgip
+
+format(surgip,big.mark = ",") -> surgipvalue
+
+D %>% subset(discipline == "Surgical" & year == Y-1 & month == M) %>% pull(in_patients) %>% sum() -> surgiplastyear
+
+paste0(round(100*(surgip - surgiplastyear)/surgiplastyear, 1), "% compared to ", M, " ", Y-1) -> surgipcomment
+if(surgip >= surgiplastyear){surgipcomment = paste0("+", surgipcomment)}
+
+D %>% subset(discipline == "Medical" & year == Y & month == M) %>% pull(in_patients) %>% sum() -> medip
+
+format(medip, big.mark = ",") -> medipvalue
+
+D %>% subset(discipline == "Medical" & year == Y-1 & month == M) %>% pull(in_patients) %>% sum() -> mediplastyear
+
+paste0(round(100*(medip - mediplastyear)/mediplastyear, 1), "% compared to ", M, " ", Y-1) -> medipcomment
+if(medip >= mediplastyear){medipcomment = paste0("+", medipcomment)}
+
+D %>% subset(discipline == "Surgical" & year == Y & month == M) %>% pull(day_cases) %>% sum() -> surgdc
+
+format(surgdc, big.mark = ",") -> surgdcvalue
+
+D %>% subset(discipline == "Surgical" & year == Y-1 & month == M) %>% pull(day_cases) %>% sum() -> surgdclastyear
+
+paste0(round(100*(surgdc - surgdclastyear)/surgdclastyear, 1), "% compared to ", M, " ", Y-1) -> surgdccomment
+if(surgdc >= surgdclastyear){surgdccomment = paste0("+", surgdccomment)}
+
+D %>% subset(discipline == "Medical" & year == Y & month == M) %>% pull(day_cases) %>% sum() -> meddc
+
+format(meddc, big.mark = ",") -> meddcvalue
+
+D %>% subset(discipline == "Medical" & year == Y-1 & month == M) %>% pull(day_cases) %>% sum() -> meddclastyear
+
+paste0(round(100*(meddc - meddclastyear)/meddclastyear, 1), "% compare to ", M, " ", Y-1) -> meddccomment
+if(meddc >= meddclastyear){meddccomment = paste0("+", meddccomment)}
+
+read.csv(file = "C:/Users/jack.lyons/Downloads/OP Group Hospital Speciality Monthly 2.csv", stringsAsFactors = FALSE) %>% mutate(Date = as.Date.character(Date, "%d/%m/%Y"), year = as.integer(format(Date, "%Y")), month = as.integer(format(Date, "%m"))) -> D1 
+
+if(m >= 11){m1 = m-10; Y1 = Y+1} else {m1 = m+2; Y1 = Y}
+D1 %>% subset(year == Y1 & month == m1) %>% subset(Date == max(Date)) %>% pull(Volume) %>% sum() -> wltotal
+format(wltotal, big.mark = ",") -> wltotalvalue
+
+D1 %>% subset(Date == as.Date("2018-01-04")) %>% pull(Volume) %>% sum() -> wltotal20180104
+
+paste0(round(100*(wltotal - wltotal20180104)/wltotal20180104, 1), "% compared to January 4, 2018") -> wltotalcomment
+if(wltotal >= wltotal20180104){wltotalcomment = paste0("+", wltotalcomment)}
+
+D1 %>% subset(year == Y1 & month == m1) %>% subset(Date == max(Date) & Wait.Bin..Months. > 15) %>% pull(Volume) %>% sum() -> wlgt15total
+format(wlgt15total, big.mark = ",") -> wlgt15totalvalue 
+
+D1 %>% subset(Date == as.Date("2018-01-04") & Wait.Bin..Months. > 15) %>% pull(Volume) %>% sum() -> wlgt15total20180104
+paste0(round(100*(wlgt15total - wlgt15total20180104)/wlgt15total20180104, 1), "% compared to January 4, 2018") -> wlgt15totalcomment
+if(wlgt15total >= wlgt15total20180104){wlgt15totalcomment = paste0("+", wlgt15totalcomment)}
+
+
+
+# Waiting up to 12 months
+if(m1 == 1){m2 = 12; Y2 = Y1-1} else {m2 = m1 - 1; Y2 = Y1}
+D1 %>% subset(year == Y1 & month == m1) %>% subset(Date == max(Date) & Wait.Bin..Months. <= 12) %>% pull(Volume) %>% sum() -> wllte12
+D1 %>% subset(year == Y2 & month == m2) %>% subset(Date == max(Date) & Wait.Bin..Months. <= 12) %>% pull(Volume) %>% sum() -> wllte12lastmonth
+D1 %>% subset(year == Y2 & month == m2) %>% subset(Date == max(Date)) %>% pull(Volume) %>% sum() -> wltotallastmonth
+paste0(round(100*(wllte12/wltotal), 1), "% (", format(wllte12, big.mark = ","), ")") -> wllte12value
+paste0("Prior Month: ", round(100*wllte12lastmonth/wltotallastmonth, 1), "% (", format(wllte12lastmonth, big.mark = ","), ")") -> wllte12comment
+
+# Waiting up to 15 months
+D1 %>% subset(year == Y1 & month == m1) %>% subset(Date == max(Date) & Wait.Bin..Months. <= 15) %>% pull(Volume) %>% sum() -> wllte15
+D1 %>% subset(year == Y2 & month == m2) %>% subset(Date == max(Date) & Wait.Bin..Months. <= 15) %>% pull(Volume) %>% sum() -> wllte15lastmonth
+D1 %>% subset(year == Y2 & month == m2) %>% subset(Date == max(Date)) %>% pull(Volume) %>% sum() -> wltotallastmonth
+paste0(round(100*(wllte15/wltotal), 1), "% (", format(wllte15, big.mark = ","), ")") -> wllte15value
+paste0("Prior Month: ", round(100*wllte15lastmonth/wltotallastmonth, 1), "% (", format(wllte15lastmonth, big.mark = ","), ")") -> wllte15comment
+
+# Waiting more than 15 months
+D1 %>% subset(year == Y2 & month == m2) %>% subset(Date == max(Date) & Wait.Bin..Months. > 15) %>% pull(Volume) %>% sum() -> wlgt15lastmonth
+D1 %>% subset(year == Y2 & month == m2) %>% subset(Date == max(Date)) %>% pull(Volume) %>% sum() -> wltotallastmonth
+paste0(round(100*(wlgt15total/wltotal), 1), "% (", format(wlgt15total, big.mark = ","), ")") -> wlgt15value
+paste0("Prior Month: ", round(100*wlgt15lastmonth/wltotallastmonth, 1), "% (", format(wlgt15lastmonth, big.mark = ","), ")") -> wlgt15comment
+
+data.frame(KPI = c("Surgical IP Discharges", "Medical IP Discharges", "Surgical DC Discharges", "Medical DC Discharges", "OP Waiting List", "OP Waiting List (+15 Months)", "Waiting up to 12 months", "Waiting up to 15 months", "Waiting more than 15 months"),Values = c(surgipvalue, medipvalue, surgdcvalue, meddcvalue, wltotalvalue, wlgt15totalvalue, wllte12value, wllte15value, wlgt15totalvalue2),Comment = c(surgipcomment, medipcomment, surgdccomment, meddccomment, wltotalcomment, wlgt15totalcomment, wllte12comment, wllte15comment, wlgt15comment)) %>% 
+  
+  plot_ly() %>% add_table(
+  rownames = FALSE,
+  columnwidth = c(2, 1, 2),
+  header = list(
+    height = 40,
+    align = c(
+      "left",
+      "left",
+      "left"
+    ),
+    line = list(
+      width = 0
+    ),
+    fill = list(
+      color = "skyblue"
+    )
+  ),
+  cells = list(
+    height = 40,
+    align = c(
+      "left",
+      "left",
+      "left"
+    ),
+    line = list(
+      width = 0
+    )
+  )
+) %>% 
+  
+  layout(
+  font = list(
+    family = "Trebuchet MS",
+    size = 25,
+    color = "grey31"
+  ),
+  margin = list(t = 5, b = 5, l = 5, r = 5),
+  autosize = FALSE,
+  width = 1300,
+  height = 975
+) %>% 
+  
+  export(file = "summary.png")
+```
+
+# Inpatient & Daycase Discharges
+
+```{r inport_nqais}
+nqais = read.csv(file = "C:/Users/jack.lyons/Downloads/NQAIS Spreadsheet.csv", stringsAsFactors = FALSE) %>% mutate(date = as.Date(date))
+```
+
+## Surgical IP & DC Discharges
+
+```{r surg_discharge_trend}
+nqais %>% subset(discipline == "Surgical") %>% group_by(date) %>% mutate(in_patients = sum(in_patients), day_cases = sum(day_cases)) %>% ungroup() %>% distinct(date, in_patients, day_cases) %>% melt(id.vars = "date") %>% group_by(variable) %>% mutate(mean_value = mean(value)) %>% ungroup -> D
+  
+
+seq.Date(from = max(D$date), to = min(D$date), by = "-3 months") %>% sort() -> xbreaks
+xbreaks %>% format("%b %Y") -> xticks
+
+D %>% mutate(txt = ifelse(date %in% xbreaks, format(value, big.mark = ","), "")) %>% ggplot(aes(x = date, color = variable)) + geom_line(aes(y = value), key_glyph = "rect", size = line_sz) + geom_point(aes(y = value), key_glyph = "rect", size = pnt_sz) + theme(panel.background = x, legend.key = x, legend.title = x, axis.title = x, legend.position = "top",  text = f1, panel.grid.major = element_line(color = "grey31", size = 1), plot.title = title_style, panel.grid.minor = x, legend.direction = "horizontal", axis.text.x = f2, axis.line = element_line(size = 1), plot.margin = unit(c(1, 1, 1, 1), "cm"), axis.ticks = element_line(size = 1)) + labs(title = "Surgical Discharges") + geom_text(aes(y = value, label = txt), vjust = "top", color = "grey31", size = txt_sz, family = "Trebuchet MS") + guides(color = guide_legend(override.aes = list(size = 30))) + scale_x_date(breaks = xbreaks, labels = xticks) + geom_line(aes(y = mean_value), size = line_sz, linetype = "dashed") + scale_color_manual(values = c(orange, blue), labels = c(paste0("Inpatients (Mean: ", D %>% subset(variable == "in_patients") %>% pull(mean_value) %>% unique() %>% round() %>% format(big.mark = ","), ")"), paste0("Daycases (Mean: ", D %>% subset(variable == "day_cases") %>% pull(mean_value) %>% unique() %>% round() %>% format(big.mark = ","), ")")))
+```
+
+## Medical IP & DC Discharges
+
+```{r med_discharge_trend}
+nqais %>% subset(discipline == "Medical") %>% group_by(date) %>% mutate(in_patients = sum(in_patients), day_cases = sum(day_cases)) %>% ungroup() %>% distinct(date, in_patients, day_cases) %>% melt(id.vars = "date") %>% group_by(variable) %>% mutate(mean_value = mean(value)) %>% ungroup -> D
+  
+
+seq.Date(from = max(D$date), to = min(D$date), by = "-3 months") %>% sort() -> xbreaks
+xbreaks %>% format("%b %Y") -> xticks
+
+D %>% mutate(txt = ifelse(date %in% xbreaks, format(value, big.mark = ","), "")) %>% ggplot(aes(x = date, color = variable)) + geom_line(aes(y = value), key_glyph = "rect", size = line_sz) + geom_point(aes(y = value), key_glyph = "rect", size = pnt_sz) + theme(panel.background = x, legend.key = x, legend.title = x, axis.title = x, legend.position = "top",  text = f1, panel.grid.major = element_line(color = "grey31", size = 1), plot.title = title_style, panel.grid.minor = x, legend.direction = "horizontal", axis.text.x = f2, axis.line = element_line(size = 1), plot.margin = unit(c(1, 1, 1, 1), "cm"), axis.ticks = element_line(size = 1)) + labs(title = "Medical Discharges") + geom_text(aes(y = value, label = txt), vjust = "top", color = "grey31", size = txt_sz, family = "Trebuchet MS") + guides(color = guide_legend(override.aes = list(size = 30))) + scale_x_date(breaks = xbreaks, labels = xticks) + geom_line(aes(y = mean_value), size = line_sz, linetype = "dashed") + scale_color_manual(values = c(orange, blue), labels = c(paste0("Inpatients (Mean: ", D %>% subset(variable == "in_patients") %>% pull(mean_value) %>% unique() %>% round() %>% format(big.mark = ","), ")"), paste0("Daycases (Mean: ", D %>% subset(variable == "day_cases") %>% pull(mean_value) %>% unique() %>% round() %>% format(big.mark = ","), ")")))
+```
+
+## Surgical Inpatient Discharges
+
+```{r surgInpatients}
+# Create the table
+tbl = nqais %>% subset(discharge_year >= max(discharge_year)-1 & discharge_month == as.numeric(format(max(as.Date(date)), "%m")) & discipline=="Surgical") %>% select(hospital,date,in_patients) %>% mutate(date1=ifelse(as.Date(date)==max(as.Date(date)), "date1", "date0")) %>% select(hospital,date1,in_patients) %>% spread(key=date1, value=in_patients) %>% mutate(date1 = ifelse(is.na(date1), 0, date1), date0=ifelse(is.na(date0), 0, date0)) %>% subset(!(date0==0 & date1==0)) %>% arrange(hospital)
+
+# Bind a row for the total and change the format
+tbl=rbind(tbl %>% arrange(hospital), data.frame(hospital="Total", date0=sum(tbl$date0), date1=sum(tbl$date1))) %>% mutate(change=ifelse(date0==0, NA, (date1-date0)/date0)) %>% mutate(date0=format(date0, big.mark=','), date1=format(date1, big.mark=','), change=ifelse(is.na(change), "", ifelse(change > 0, paste0("+", round(100*change, 1), "%"), paste0(round(100*change, 1), "%"))))
+
+# Find the latest month and the same month from the previous year 
+# and format them as MMMM YYYY
+H = unique(as.Date(subset(nqais, discharge_year >= max(discharge_year)-1 & discharge_month==max(subset(nqais, discharge_year==max(discharge_year))$discharge_month))$date))
+H1=format(max(H), "%B %Y")
+H0=format(min(H), "%B %Y")
+
+# Assign the hospital names to the row names
+row.names(tbl) = tbl$hospital; tbl = tbl %>% select(date0, date1, change)
+
+# Change the header names
+names(tbl) = c(H0, H1, "% Change")
+
+n = nrow(tbl)-1
+
+tbl %>% plot_ly() %>% add_table(columnwidth = c(2,1,1,1), header = list(height = 30, font = list(family = "Trebuchet MS", size = 20, color = "grey31", face = "bold"), fill = list(color = "#B4C7DC"), align = c("left", rep("right", 3)), line = list(width = 0)), cells = list(font = list(family = "Trebuchet MS", size = 20, color = "grey31"), height = 25, align = c("left", rep("right", 3)), line = list(width=0), fill = list(color = list(rep(c(rep("white", n), "#B4C7DC"), 4))))) %>% 
+  
+  layout(autosize = FALSE, width = 1300, height = 975, margin = list(t=2,b=2,l=2,r=2)) %>%
+  
+  export(file = "tbl.png")
+```
+
+## Medical Inpatient Discharges
+
+```{r medInpatients}
+# Create the table
+tbl = nqais %>% subset(discharge_year >= max(discharge_year)-1 & discharge_month == as.numeric(format(max(as.Date(date)), "%m")) & discipline=="Medical") %>% select(hospital,date,in_patients) %>% mutate(date1=ifelse(as.Date(date)==max(as.Date(date)), "date1", "date0")) %>% select(hospital,date1,in_patients) %>% spread(key=date1, value=in_patients) %>% mutate(date1 = ifelse(is.na(date1), 0, date1), date0=ifelse(is.na(date0), 0, date0)) %>% subset(!(date0==0 & date1==0)) %>% arrange(hospital)
+
+# Bind a row for the total and change the format
+tbl=rbind(tbl %>% arrange(hospital), data.frame(hospital="Total", date0=sum(tbl$date0), date1=sum(tbl$date1))) %>% mutate(change=ifelse(date0==0, NA, (date1-date0)/date0)) %>% mutate(date0=format(date0, big.mark=','), date1=format(date1, big.mark=','), change=ifelse(is.na(change), "", ifelse(change > 0, paste0("+", round(100*change, 1), "%"), paste0(round(100*change, 1), "%"))))
+
+# Find the latest month and the same month from the previous year 
+# and format them as MMMM YYYY
+H = unique(as.Date(subset(nqais, discharge_year >= max(discharge_year)-1 & discharge_month==max(subset(nqais, discharge_year==max(discharge_year))$discharge_month))$date))
+H1=format(max(H), "%B %Y")
+H0=format(min(H), "%B %Y")
+
+# Assign the hospital names to the row names
+row.names(tbl) = tbl$hospital; tbl = tbl %>% select(date0, date1, change)
+
+# Change the header names
+names(tbl) = c(H0, H1, "% Change")
+
+n = nrow(tbl)-1
+
+tbl %>% plot_ly() %>% add_table(columnwidth = c(2,1,1,1), header = list(height = 30, font = list(family = "Trebuchet MS", size = 20, color = "grey31", face = "bold"), fill = list(color = "#B4C7DC"), align = c("left", rep("right", 3)), line = list(width = 0)), cells = list(font = list(family = "Trebuchet MS", size = 20, color = "grey31"), height = 25, align = c("left", rep("right", 3)), line = list(width=0), fill = list(color = list(rep(c(rep("white", n), "#B4C7DC"), 4))))) %>% 
+  
+  layout(autosize = FALSE, width = 1300, height = 975, margin = list(t=2,b=2,l=2,r=2)) %>%
+  
+  export(file = "tbl.png")
+
+```
+
+## Surgical Daycase Discharges
+
+```{r surgDaycases}
+# Create the table
+tbl = nqais %>% subset(discharge_year >= max(discharge_year)-1 & discharge_month == as.numeric(format(max(as.Date(date)), "%m")) & discipline=="Surgical") %>% select(hospital,date,day_cases) %>% mutate(date1=ifelse(as.Date(date)==max(as.Date(date)), "date1", "date0")) %>% select(hospital,date1,day_cases) %>% spread(key=date1, value=day_cases) %>% mutate(date1 = ifelse(is.na(date1), 0, date1), date0=ifelse(is.na(date0), 0, date0)) %>% subset(!(date0==0 & date1==0)) %>% arrange(hospital)
+
+# Bind a row for the total and change the format
+tbl=rbind(tbl %>% arrange(hospital), data.frame(hospital="Total", date0=sum(tbl$date0), date1=sum(tbl$date1))) %>% mutate(change=ifelse(date0==0, NA, (date1-date0)/date0)) %>% mutate(date0=format(date0, big.mark=','), date1=format(date1, big.mark=','), change=ifelse(is.na(change), "", ifelse(change > 0, paste0("+", round(100*change, 1), "%"), paste0(round(100*change, 1), "%"))))
+
+# Find the latest month and the same month from the previous year 
+# and format them as MMMM YYYY
+H = unique(as.Date(subset(nqais, discharge_year >= max(discharge_year)-1 & discharge_month==max(subset(nqais, discharge_year==max(discharge_year))$discharge_month))$date))
+H1=format(max(H), "%B %Y")
+H0=format(min(H), "%B %Y")
+
+# Assign the hospital names to the row names
+row.names(tbl) = tbl$hospital; tbl = tbl %>% select(date0, date1, change)
+
+# Change the header names
+names(tbl) = c(H0, H1, "% Change")
+
+n = nrow(tbl)-1
+
+tbl %>% plot_ly() %>% add_table(columnwidth = c(2,1,1,1), header = list(height = 30, font = list(family = "Trebuchet MS", size = 20, color = "grey31", face = "bold"), fill = list(color = "#B4C7DC"), align = c("left", rep("right", 3)), line = list(width = 0)), cells = list(font = list(family = "Trebuchet MS", size = 20, color = "grey31"), height = 25, align = c("left", rep("right", 3)), line = list(width=0), fill = list(color = list(rep(c(rep("white", n), "#B4C7DC"), 4))))) %>% 
+  
+  layout(autosize = FALSE, width = 1300, height = 975, margin = list(t=2,b=2,l=2,r=2)) %>%
+  
+  export(file = "tbl.png")
+```
+
+
+
+## Medical Daycase Discharges
+
+```{r medDaycase}
+# Create the table
+tbl = nqais %>% subset(discharge_year >= max(discharge_year)-1 & discharge_month == as.numeric(format(max(as.Date(date)), "%m")) & discipline=="Medical") %>% select(hospital,date,day_cases) %>% mutate(date1=ifelse(as.Date(date)==max(as.Date(date)), "date1", "date0")) %>% select(hospital,date1,day_cases) %>% spread(key=date1, value=day_cases) %>% mutate(date1 = ifelse(is.na(date1), 0, date1), date0=ifelse(is.na(date0), 0, date0)) %>% subset(!(date0==0 & date1==0)) %>% arrange(hospital)
+
+# Bind a row for the total and change the format
+tbl=rbind(tbl %>% arrange(hospital), data.frame(hospital="Total", date0=sum(tbl$date0), date1=sum(tbl$date1))) %>% mutate(change=ifelse(date0==0, NA, (date1-date0)/date0)) %>% mutate(date0=format(date0, big.mark=','), date1=format(date1, big.mark=','), change=ifelse(is.na(change), "", ifelse(change > 0, paste0("+", round(100*change, 1), "%"), paste0(round(100*change, 1), "%"))))
+
+# Find the latest month and the same month from the previous year 
+# and format them as MMMM YYYY
+H = unique(as.Date(subset(nqais, discharge_year >= max(discharge_year)-1 & discharge_month==max(subset(nqais, discharge_year==max(discharge_year))$discharge_month))$date))
+H1=format(max(H), "%B %Y")
+H0=format(min(H), "%B %Y")
+
+# Assign the hospital names to the row names
+row.names(tbl) = tbl$hospital; tbl = tbl %>% select(date0, date1, change)
+
+# Change the header names
+names(tbl) = c(H0, H1, "% Change")
+
+n = nrow(tbl)-1
+
+tbl %>% plot_ly() %>% add_table(columnwidth = c(2,1,1,1), header = list(height = 30, font = list(family = "Trebuchet MS", size = 20, color = "grey31", face = "bold"), fill = list(color = "#B4C7DC"), align = c("left", rep("right", 3)), line = list(width = 0)), cells = list(font = list(family = "Trebuchet MS", size = 20, color = "grey31"), height = 25, align = c("left", rep("right", 3)), line = list(width=0), fill = list(color = list(rep(c(rep("white", n), "#B4C7DC"), 4))))) %>% 
+  
+  layout(autosize = FALSE, width = 1300, height = 975, margin = list(t=2,b=2,l=2,r=2)) %>%
+  
+  export(file = "tbl.png")
+```
+
+# Average Length of Stay
+
+## Medical AvLOS
+
+```{r medAvlos}
+# Create the table
+tbl = nqais %>% subset(discharge_year >= max(discharge_year)-1 & discharge_month == as.numeric(format(max(as.Date(date)), "%m")) & discipline=="Medical") %>% select(hospital,date,avlos) %>% mutate(date1=ifelse(as.Date(date)==max(as.Date(date)), "date1", "date0")) %>% select(hospital,date1,avlos) %>% spread(key=date1, value=avlos) %>% mutate(date1 = ifelse(is.na(date1), 0, date1), date0=ifelse(is.na(date0), 0, date0)) %>% arrange(hospital) %>% mutate(change=ifelse(date0==0, NA, (date1-date0)/date0)) %>% mutate(date0=round(date0, 1), date1=round(date1, 1), change=ifelse(is.na(change), "", ifelse(change > 0, paste0("+", round(100*change, 1), "%"), paste0(round(100*change, 1), "%")))) %>% subset(!(date0==0 & date1==0)) %>% arrange(hospital)
+
+# Find the latest month and the same month from the previous year 
+# and format them as MMMM YYYY
+H = unique(as.Date(subset(nqais, discharge_year >= max(discharge_year)-1 & discharge_month==max(subset(nqais, discharge_year==max(discharge_year))$discharge_month))$date))
+H1=format(max(H), "%B %Y")
+H0=format(min(H), "%B %Y")
+
+# Assign the hospital names to the row names
+row.names(tbl) = tbl$hospital; tbl = tbl %>% select(date0, date1, change)
+
+# Change the header names
+names(tbl) = c(H0, H1, "% Change")
+
+n = nrow(tbl)-1
+
+tbl %>% plot_ly() %>% 
+  
+  add_table(columnwidth = c(2,1,1,1), header = list(height = 30, font = list(family = "Trebuchet MS", size = 20, color = "grey31", face = "bold"), fill = list(color = "#B4C7DC"), align = c("left", rep("right", 3)), line = list(width = 0)), cells = list(font = list(family = "Trebuchet MS", size = 20, color = "grey31"), height = 25, align = c("left", rep("right", 3)), line = list(width=0), fill = list(color = "white"))) %>%
+  
+  layout(autosize = FALSE, width = 1300, height = 975, margin = list(t=2,b=2,l=2,r=2)) %>%
+  
+  export(file = "tbl.png")
+```
+
+## Medical AvLOS (30 Day Stay or Less)
+
+```{r medAvlosLE30}
+# Create the table
+tbl = nqais %>% subset(discharge_year >= max(discharge_year)-1 & discharge_month == as.numeric(format(max(as.Date(date)), "%m")) & discipline=="Medical") %>% select(hospital,date,avlos_le_30) %>% mutate(date1=ifelse(as.Date(date)==max(as.Date(date)), "date1", "date0")) %>% select(hospital,date1,avlos_le_30) %>% spread(key=date1, value=avlos_le_30) %>% mutate(date1 = ifelse(is.na(date1), 0, date1), date0=ifelse(is.na(date0), 0, date0)) %>% arrange(hospital) %>% mutate(change=ifelse(date0==0, NA, (date1-date0)/date0)) %>% mutate(date0=round(date0, 1), date1=round(date1, 1), change=ifelse(is.na(change), "", ifelse(change > 0, paste0("+", round(100*change, 1), "%"), paste0(round(100*change, 1), "%")))) %>% subset(!(date0==0 & date1==0)) %>% arrange(hospital)
+
+# Find the latest month and the same month from the previous year 
+# and format them as MMMM YYYY
+H = unique(as.Date(subset(nqais, discharge_year >= max(discharge_year)-1 & discharge_month==max(subset(nqais, discharge_year==max(discharge_year))$discharge_month))$date))
+H1=format(max(H), "%B %Y")
+H0=format(min(H), "%B %Y")
+
+# Assign the hospital names to the row names
+row.names(tbl) = tbl$hospital; tbl = tbl %>% select(date0, date1, change)
+
+# Change the header names
+names(tbl) = c(H0, H1, "% Change")
+
+n = nrow(tbl)-1
+
+tbl %>% plot_ly() %>% 
+  
+  add_table(columnwidth = c(2,1,1,1), header = list(height = 30, font = list(family = "Trebuchet MS", size = 20, color = "grey31", face = "bold"), fill = list(color = "#B4C7DC"), align = c("left", rep("right", 3)), line = list(width = 0)), cells = list(font = list(family = "Trebuchet MS", size = 20, color = "grey31"), height = 25, align = c("left", rep("right", 3)), line = list(width=0), fill = list(color = "white"))) %>%
+  
+  layout(autosize = FALSE, width = 1300, height = 975, margin = list(t=2,b=2,l=2,r=2)) %>%
+  
+  export(file = "tbl.png")
+```
+
+
+
+## Medical AvLOS (More than 30 Day Stay)
+
+```{r medAvlosGT30}
+# Create the table
+tbl = nqais %>% subset(discharge_year >= max(discharge_year)-1 & discharge_month == as.numeric(format(max(as.Date(date)), "%m")) & discipline=="Medical") %>% select(hospital,date,avlos_gt_30) %>% mutate(date1=ifelse(as.Date(date)==max(as.Date(date)), "date1", "date0")) %>% select(hospital,date1,avlos_gt_30) %>% spread(key=date1, value=avlos_gt_30) %>% mutate(date1 = ifelse(is.na(date1), 0, date1), date0=ifelse(is.na(date0), 0, date0)) %>% arrange(hospital) %>% mutate(change=ifelse(date0==0, NA, (date1-date0)/date0)) %>% mutate(date0=round(date0, 1), date1=round(date1, 1), change=ifelse(is.na(change), "", ifelse(change > 0, paste0("+", round(100*change, 1), "%"), paste0(round(100*change, 1), "%")))) %>% subset(!(date0==0 & date1==0)) %>% arrange(hospital)
+
+# Find the latest month and the same month from the previous year 
+# and format them as MMMM YYYY
+H = unique(as.Date(subset(nqais, discharge_year >= max(discharge_year)-1 & discharge_month==max(subset(nqais, discharge_year==max(discharge_year))$discharge_month))$date))
+H1=format(max(H), "%B %Y")
+H0=format(min(H), "%B %Y")
+
+# Assign the hospital names to the row names
+row.names(tbl) = tbl$hospital; tbl = tbl %>% select(date0, date1, change)
+
+# Change the header names
+names(tbl) = c(H0, H1, "% Change")
+
+n = nrow(tbl)-1
+
+tbl %>% plot_ly() %>% add_table(columnwidth = c(2,1,1,1), header = list(height = 30, font = list(family = "Trebuchet MS", size = 20, color = "grey31", face = "bold"), fill = list(color = "#B4C7DC"), align = c("left", rep("right", 3)), line = list(width = 0)), cells = list(font = list(family = "Trebuchet MS", size = 20, color = "grey31"), height = 25, align = c("left", rep("right", 3)), line = list(width=0), fill = list(color = "white"))) %>%
+
+  layout(autosize = FALSE, width = 1300, height = 975, margin = list(t=2,b=2,l=2,r=2)) %>%
+  
+  export(file = "tbl.png")  
+```
+
+
+
+## Surgical AvLOS
+
+```{r surgAvlos}
+# Create the table
+tbl = nqais %>% subset(discharge_year >= max(discharge_year)-1 & discharge_month == as.numeric(format(max(as.Date(date)), "%m")) & discipline=="Surgical") %>% select(hospital,date,avlos) %>% mutate(date1=ifelse(as.Date(date)==max(as.Date(date)), "date1", "date0")) %>% select(hospital,date1,avlos) %>% spread(key=date1, value=avlos) %>% mutate(date1 = ifelse(is.na(date1), 0, date1), date0=ifelse(is.na(date0), 0, date0)) %>% arrange(hospital) %>% mutate(change=ifelse(date0==0, NA, (date1-date0)/date0)) %>% mutate(date0=round(date0, 1), date1=round(date1, 1), change=ifelse(is.na(change), "", ifelse(change > 0, paste0("+", round(100*change, 1), "%"), paste0(round(100*change, 1), "%")))) %>% subset(!(date0==0 & date1==0)) %>% arrange(hospital)
+
+# Find the latest month and the same month from the previous year 
+# and format them as MMMM YYYY
+H = unique(as.Date(subset(nqais, discharge_year >= max(discharge_year)-1 & discharge_month==max(subset(nqais, discharge_year==max(discharge_year))$discharge_month))$date))
+H1=format(max(H), "%B %Y")
+H0=format(min(H), "%B %Y")
+
+# Assign the hospital names to the row names
+row.names(tbl) = tbl$hospital; tbl = tbl %>% select(date0, date1, change)
+
+# Change the header names
+names(tbl) = c(H0, H1, "% Change")
+
+n = nrow(tbl)-1
+
+tbl %>% plot_ly() %>% add_table(columnwidth = c(2,1,1,1), header = list(height = 30, font = list(family = "Trebuchet MS", size = 20, color = "grey31", face = "bold"), fill = list(color = "#B4C7DC"), align = c("left", rep("right", 3)), line = list(width = 0)), cells = list(font = list(family = "Trebuchet MS", size = 20, color = "grey31"), height = 25, align = c("left", rep("right", 3)), line = list(width=0), fill = list(color = "white"))) %>%
+  
+  layout(autosize = FALSE, width = 1300, height = 975, margin = list(t=2,b=2,l=2,r=2)) %>%
+  
+  export(file = "tbl.png")  
+```
+
+
+
+## Surgical AvLOS (30 Day Stay or Less)
+
+```{r surgAvlosLE30}
+# Create the table
+tbl = nqais %>% subset(discharge_year >= max(discharge_year)-1 & discharge_month == as.numeric(format(max(as.Date(date)), "%m")) & discipline=="Surgical") %>% select(hospital,date,avlos_le_30) %>% mutate(date1=ifelse(as.Date(date)==max(as.Date(date)), "date1", "date0")) %>% select(hospital,date1,avlos_le_30) %>% spread(key=date1, value=avlos_le_30) %>% mutate(date1 = ifelse(is.na(date1), 0, date1), date0=ifelse(is.na(date0), 0, date0)) %>% arrange(hospital) %>% mutate(change=ifelse(date0==0, NA, (date1-date0)/date0)) %>% mutate(date0=round(date0, 1), date1=round(date1, 1), change=ifelse(is.na(change), "", ifelse(change > 0, paste0("+", round(100*change, 1), "%"), paste0(round(100*change, 1), "%")))) %>% subset(!(date0==0 & date1==0)) %>% arrange(hospital)
+
+# Find the latest month and the same month from the previous year 
+# and format them as MMMM YYYY
+H = unique(as.Date(subset(nqais, discharge_year >= max(discharge_year)-1 & discharge_month==max(subset(nqais, discharge_year==max(discharge_year))$discharge_month))$date))
+H1=format(max(H), "%B %Y")
+H0=format(min(H), "%B %Y")
+
+# Assign the hospital names to the row names
+row.names(tbl) = tbl$hospital; tbl = tbl %>% select(date0, date1, change)
+
+# Change the header names
+names(tbl) = c(H0, H1, "% Change")
+
+n = nrow(tbl)-1
+
+tbl %>% plot_ly() %>% add_table(columnwidth = c(2,1,1,1), header = list(height = 30, font = list(family = "Trebuchet MS", size = 20, color = "grey31", face = "bold"), fill = list(color = "#B4C7DC"), align = c("left", rep("right", 3)), line = list(width = 0)), cells = list(font = list(family = "Trebuchet MS", size = 20, color = "grey31"), height = 25, align = c("left", rep("right", 3)), line = list(width=0), fill = list(color = "white"))) %>%
+  
+  layout(autosize = FALSE, width = 1300, height = 975, margin = list(t=2,b=2,l=2,r=2)) %>%
+  
+  export(file = "tbl.png")  
+```
+
+
+## Surgical AvLOS (More Than 30 Day Stay)
+
+```{r surgAvlosGT30}
+# Create the table
+tbl = nqais %>% subset(discharge_year >= max(discharge_year)-1 & discharge_month == as.numeric(format(max(as.Date(date)), "%m")) & discipline=="Surgical") %>% select(hospital,date,avlos_gt_30) %>% mutate(date1=ifelse(as.Date(date)==max(as.Date(date)), "date1", "date0")) %>% select(hospital,date1,avlos_gt_30) %>% spread(key=date1, value=avlos_gt_30) %>% mutate(date1 = ifelse(is.na(date1), 0, date1), date0=ifelse(is.na(date0), 0, date0)) %>% arrange(hospital) %>% mutate(change=ifelse(date0==0, NA, (date1-date0)/date0)) %>% mutate(date0=round(date0, 1), date1=round(date1, 1), change=ifelse(is.na(change), "", ifelse(change > 0, paste0("+", round(100*change, 1), "%"), paste0(round(100*change, 1), "%")))) %>% subset(!(date0==0 & date1==0)) %>% arrange(hospital)
+
+# Find the latest month and the same month from the previous year 
+# and format them as MMMM YYYY
+H = unique(as.Date(subset(nqais, discharge_year >= max(discharge_year)-1 & discharge_month==max(subset(nqais, discharge_year==max(discharge_year))$discharge_month))$date))
+H1=format(max(H), "%B %Y")
+H0=format(min(H), "%B %Y")
+
+# Assign the hospital names to the row names
+row.names(tbl) = tbl$hospital; tbl = tbl %>% select(date0, date1, change)
+
+# Change the header names
+names(tbl) = c(H0, H1, "% Change")
+
+n = nrow(tbl)-1
+
+tbl %>% plot_ly() %>% add_table(columnwidth = c(2,1,1,1), header = list(height = 30, font = list(family = "Trebuchet MS", size = 20, color = "grey31", face = "bold"), fill = list(color = "#B4C7DC"), align = c("left", rep("right", 3)), line = list(width = 0)), cells = list(font = list(family = "Trebuchet MS", size = 20, color = "grey31"), height = 25, align = c("left", rep("right", 3)), line = list(width=0), fill = list(color = "white"))) %>%
+  
+  layout(autosize = FALSE, width = 1300, height = 975, margin = list(t=2,b=2,l=2,r=2)) %>%
+  
+  export(file = "tbl.png")
+```
+
+
+# Day of Surgery Admission
+
+## DOSA % by Hospital
+
+```{r dosa}
+data0 = merge(x = read.csv("C:/Users/jack.lyons/Downloads/DOSA Report.csv", stringsAsFactors = FALSE) %>% mutate(date=as.Date(date)) %>% subset(date==min(tail(sort(unique(date)), 2))), y = data.frame(group=c('NAT','DML','IEHG','RCSI','SAOLTA','SSW','UL'),order=7:1),by='group',all.y=T) %>% arrange(-order,-hospitalnum); data0$order1 = 1:nrow(data0)
+
+data1 = merge(x = read.csv("C:/Users/jack.lyons/Downloads/DOSA Report.csv", stringsAsFactors = FALSE) %>% mutate(date=as.Date(date)) %>% subset(date==max(date)), y = data.frame(group=c('NAT','DML','IEHG','RCSI','SAOLTA','SSW','UL'),order=7:1),by='group',all.y=T) %>% arrange(-order,-hospitalnum); data1$order1 = 1:nrow(data1)
+
+data0 %>% pull(date) %>% unique() %>% format("%B %Y") -> xt0
+data1 %>% pull(date) %>% unique() %>% format("%B %Y") -> xt1
+
+data0 %>% ggplot(aes(x = reorder(hospital, -order1), y = value, label = paste0(round(100*value, 1), "%"))) + 
+  
+  coord_flip() + 
+  
+  geom_bar(stat = "identity", fill = green) + 
+  
+  geom_text(hjust = "left", size = txt_sz, family = "Trebuchet MS", color = "grey31") +
+  
+  labs(y = xt0) + 
+  
+  scale_y_continuous(limits = c(0, 1.05), labels = scales::percent) +
+  
+  theme(axis.ticks = x, axis.line = x, panel.background = x, axis.title.y = x, axis.text = f1, axis.title.x = f1) -> p1
+
+data1 %>% ggplot(aes(x = reorder(hospital, -order1), y = value, label = paste0(round(100*value, 1), "%"))) + 
+  
+  coord_flip() + 
+  
+  geom_bar(stat = "identity", fill = blue) + 
+  
+  geom_text(hjust = "left", size = txt_sz, family = "Trebuchet MS", color = "grey31") +
+  
+  labs(y = xt1) + 
+  
+  scale_y_continuous(limits = c(0, 1.05), labels = scales::percent) +
+  
+  theme(axis.ticks = x, axis.line = x, panel.background = x, axis.title.y = x, axis.text.x = f1, axis.text.y = x, axis.title.x = f1) -> p2
+
+g1 = ggplotGrob(p1); g2 = ggplotGrob(p2)
+cbind(g1, g2, size = "first") -> g
+grid.newpage()
+grid.draw(g)
+```
+
+# Re-Admission %
+
+## Surgical Re-Admission %
+
+```{r surgReadm}
+nqais %>%  subset(discipline=="Surgical") %>% select(readmission_lt_7, readmission_lt_30, in_patients, date) %>% mutate(readm7Count=ifelse(is.na(readmission_lt_7), 0, as.integer(readmission_lt_7/100*in_patients)), readm30Count = ifelse(is.na(readmission_lt_30), 0, readmission_lt_30*in_patients/100)) %>% group_by(date) %>% mutate(readm7Count = sum(readm7Count), readm30Count = sum(readm30Count), in_patients = sum(in_patients)) %>% ungroup() %>% distinct(date, in_patients, readm7Count, readm30Count) %>% mutate(readmission7Rate = readm7Count/in_patients, readmission30Rate=readm30Count/in_patients, date=as.Date(date)) %>% subset(date != max(date)) %>% distinct(date, readmission7Rate, readmission30Rate) %>% melt(id.vars = "date") -> D
+
+seq.Date(from = max(D$date), to = min(D$date), by = "-3 months") %>% sort() -> xbreaks
+xbreaks %>% format("%b %Y") -> xticks
+
+yt = seq(from = floor(min(100*D$value))/100, to = ceiling(max(100*D$value))/100, by = 0.01)
+ytt = paste0(100*yt,"%")
+
+D %>% mutate(txt = ifelse(date %in% xbreaks, paste0(round(100*value, 1), "%"), "")) %>% ggplot(aes(x = date, color = variable)) + geom_line(aes(y = value), key_glyph = "rect", size = line_sz) + geom_point(aes(y = value), key_glyph = "rect", size = pnt_sz) + theme(panel.background = x, legend.key = x, legend.title = x, axis.title = x, legend.position = "top",  text = f1, panel.grid.major = element_line(color = "grey31", size = 1), plot.title = title_style, panel.grid.minor = x, legend.direction = "horizontal", axis.text.x = f2, axis.line = element_line(size = 1), plot.margin = unit(c(1, 1, 1, 1), "cm"), axis.ticks = element_line(size = 1)) + labs(title = "Surgical Readmission %") + geom_text(aes(y = value, label = txt), vjust = "top", color = "grey31", size = txt_sz, family = "Trebuchet MS") + guides(color = guide_legend(override.aes = list(size = 30))) + scale_x_date(breaks = xbreaks, labels = xticks) + scale_color_manual(values = c(orange, blue), labels = c("7-days", "30-days")) + scale_y_continuous(breaks = yt, labels = ytt)
+```
+
+
+## Medical Re-Admission %
+
+```{r MedReadm}
+nqais %>%  subset(discipline=="Medical") %>% select(readmission_lt_7, readmission_lt_30, in_patients, date) %>% mutate(readm7Count=ifelse(is.na(readmission_lt_7), 0, as.integer(readmission_lt_7/100*in_patients)), readm30Count = ifelse(is.na(readmission_lt_30), 0, readmission_lt_30*in_patients/100)) %>% group_by(date) %>% mutate(readm7Count = sum(readm7Count), readm30Count = sum(readm30Count), in_patients = sum(in_patients)) %>% ungroup() %>% distinct(date, in_patients, readm7Count, readm30Count) %>% mutate(readmission7Rate = readm7Count/in_patients, readmission30Rate=readm30Count/in_patients, date=as.Date(date)) %>% subset(date != max(date)) %>% distinct(date, readmission7Rate, readmission30Rate) %>% melt(id.vars = "date") -> D
+
+seq.Date(from = max(D$date), to = min(D$date), by = "-3 months") %>% sort() -> xbreaks
+xbreaks %>% format("%b %Y") -> xticks
+
+yt = seq(from = floor(min(100*D$value))/100, to = ceiling(max(100*D$value))/100, by = 0.01)
+ytt = paste0(100*yt,"%")
+
+D %>% mutate(txt = ifelse(date %in% xbreaks, paste0(round(100*value, 1), "%"), "")) %>% ggplot(aes(x = date, color = variable)) + geom_line(aes(y = value), key_glyph = "rect", size = line_sz) + geom_point(aes(y = value), key_glyph = "rect", size = pnt_sz) + theme(panel.background = x, legend.key = x, legend.title = x, axis.title = x, legend.position = "top",  text = f1, panel.grid.major = element_line(color = "grey31", size = 1), plot.title = title_style, panel.grid.minor = x, legend.direction = "horizontal", axis.text.x = f2, axis.line = element_line(size = 1), plot.margin = unit(c(1, 1, 1, 1), "cm"), axis.ticks = element_line(size = 1)) + labs(title = "Medical Readmission %") + geom_text(aes(y = value, label = txt), vjust = "top", color = "grey31", size = txt_sz, family = "Trebuchet MS") + guides(color = guide_legend(override.aes = list(size = 30))) + scale_x_date(breaks = xbreaks, labels = xticks) + scale_color_manual(values = c(orange, blue), labels = c("7-days", "30-days")) + scale_y_continuous(breaks = yt, labels = ytt)
+```
+
+# Outpatient Waiting List
+
+```{r inportOPDWL}
+owl = read.csv("C:/Users/jack.lyons/Downloads/OP Group Hospital Speciality Monthly 2.csv", stringsAsFactors = FALSE) %>% 
+  
+  select(Group,Hospital,Specialty,Date,Wait.Bin..Months.,Volume) %>% 
+  
+  rename(grp=1,hosp=2,spec=3,date=4,wait=5,volume=6) %>% 
+  
+  mutate(date = as.Date.character(date, "%d/%m/%Y"), volumeGT15 = ifelse(wait > 15, volume, 0))
+
+owl %>% subset(date == max(date)) %>% pull(date) %>% unique() %>% format("%B %d, %Y") -> wldate
+```
+
+## Total Waiting List Trend
+
+```{r owlTrend}
+owlTotal = aggregate(volume~date, data=owl %>% subset(date >= as.Date("2018-01-01")), FUN=sum)
+
+owlTotal %>% mutate(year = as.integer(format(date, "%Y"))) %>% group_by(year) %>% mutate(date = min(date)) %>% ungroup() %>% pull(date) %>% unique() -> selectdates
+
+owlTotal %>% pull(date) %>% max() %>% append(selectdates) -> selectdates
+
+owlTotal %>% mutate(lbl = ifelse(date %in% selectdates, format(volume, big.mark = ","), "")) -> owlTotal
+
+xt=seq.Date(from=min(owlTotal$date), to=max(owlTotal$date), by="month")
+xtt=format(xt, "%b %Y")
+
+owlTotal %>% ggplot(aes(x = date, y = volume, label = lbl)) + geom_line(size = line_sz, color = blue) + geom_point(size = pnt_sz, color = blue) + labs(title = "Total Outpatient Waiting List", subtitle = paste("Up to:", format(max(selectdates), "%B %d, %Y"))) + theme(panel.background = x, panel.grid.major = grid_line, axis.title = x, axis.line = x, axis.ticks = x, axis.text.y = f1, axis.text.x = f2, plot.title = title_style, plot.subtitle = subtitle_style) + geom_text(size = txt_sz, family = "Trebuchet MS") + scale_y_continuous(labels = scales::comma) + scale_x_date(breaks = xt, labels = xtt)
+
+# owlTotal %>% 
+#   
+#   plot_ly(x = ~date, y=~volume) %>% 
+#   
+#   add_lines(line = list(width = 15)) %>% 
+#   
+#   layout(font = list(family = "Trebuchet MS", size = 80, color = "grey31"), xaxis=list(title="", tickangle=90, tickvals=xt, ticktext=xtt), yaxis=list(title="Waiting List Total")) %>% 
+#   
+#   add_annotations(data = subset(owlTotal, date %in% selectdates), showarrow = FALSE, xanchor = "left", text = ~format(volume, big.mark = ","), bgcolor = "white")
+  
+  #add_annotations(xanchor = "right", arrowwidth = 10, yanchor = "top", ax = -400, ay = 800, data = subset(owlTotal, date==max(date)), text = ~paste(format(date, "%B %d, %Y"), paste("Volume:", format(volume, big.mark = ',')), sep = "\n"))
+```
+
+## Total Waiting List (+15 Months) Trend
+
+```{r owlGT15Trend}
+owlTotal = aggregate(volume~date, data=owl %>% subset(date >= as.Date("2018-01-01") & wait > 15), FUN=sum)
+
+owlTotal %>% mutate(lbl = ifelse(date %in% selectdates, format(volume, big.mark = ","), "")) -> owlTotal
+
+xt=seq.Date(from=min(owlTotal$date), to=max(owlTotal$date), by="month")
+xtt=format(xt, "%b %Y")
+
+owlTotal %>% ggplot(aes(x = date, y = volume, label = lbl)) + geom_line(size = line_sz, color = blue) + geom_point(size = pnt_sz, color = blue) + labs(title = "Total Outpatient Waiting List (More Than 15 Months)", subtitle = paste("Up to:", format(max(selectdates), "%B %d, %Y"))) + theme(panel.background = x, panel.grid.major = grid_line, axis.title = x, axis.line = x, axis.ticks = x, axis.text.y = f1, axis.text.x = f2, plot.title = title_style, plot.subtitle = subtitle_style) + geom_text(size = txt_sz, family = "Trebuchet MS") + scale_y_continuous(labels = scales::comma) + scale_x_date(breaks = xt, labels = xtt)
+```
+
+
+
+## Waiting List Distribution
+
+```{r owlDistribution}
+owlDist = owl %>% subset(date==max(date)) %>% select(wait, volume) %>% group_by(wait) %>% mutate(volume = sum(volume)) %>% ungroup() %>% distinct() %>% arrange(wait) %>% mutate(runningVol = cumsum(volume), portion = runningVol/max(runningVol), label = paste0(round(100*portion, 1), "%"))
+
+owl15 = subset(owlDist, wait == 15)
+owl12 = subset(owlDist, wait == 12)
+owlMax = subset(owlDist, wait == max(wait))
+  
+owl15 = subset(owlDist, wait == 15)
+owl12 = subset(owlDist, wait == 12)
+owlMax = subset(owlDist, wait == max(wait))
+
+subplot(
+  
+  owlDist %>%
+    
+    plot_ly(x = ~wait, y = ~runningVol, type = "scatter", mode = "lines+markers", line = list(width = 10, color = "darkred"), marker = list(color = "darkred", width = 15)) %>%
+    
+    add_annotations(showarrow = FALSE, xanchor = "right", yanchor = "bottom", text = ~label, data = subset(owlDist, wait %in% c(1,3,6,9,12,15,18,21,24,27,30,33,36,39,42,45,49))) %>%
+    
+    add_annotations(arrowwidth = 10, ax = 2000, ay = -40, xanchor = "left", data = owl15, y = ~runningVol, text = ~paste("Waiting up to 15 months", paste("Volume:", format(runningVol, big.mark = ',')), paste("Portion of Running Total:", label), sep = "\n")) %>% 
+    
+    add_annotations(data = owl12, arrowwidth = 10, xanchor = "left", y = ~runningVol, text = ~paste("Waiting up to 12 months", paste("Volume:", format(runningVol, big.mark = ',')), paste("Portion of Running Total:", label), sep = "\n"), ax = 600, ay = 400) %>%
+    
+    layout(yaxis = list(title = "Cumulative Volume"), xaxis = list(tickvals = c(1,3,6,9,12,15,18,21,24,27,30,33,36,39,42,45,49), ticktext = c(1,3,6,9,12,15,18,21,24,27,30,33,36,39,42,45,"48+"))),
+  
+  owlDist %>% plot_ly(x = ~wait, y = ~volume) %>% 
+    
+    add_bars(marker = list(color = "royalblue")) %>% 
+    
+    add_annotations(yanchor = "bottom", showarrow = FALSE, textangle = 90, text = ~format(volume, big.mark = ",")) %>%
+    
+    layout(yaxis = list(title = "Volume"), xaxis = list(tickvals = c(1,3,6,9,12,15,18,21,24,27,30,33,36,39,42,45,49), ticktext = c(1,3,6,9,12,15,18,21,24,27,30,33,36,39,42,45,"48+"))),
+  
+  nrows = 2,
+  
+  shareX = TRUE,
+  
+  titleY = TRUE
+  
+) %>%
+  
+  layout(font = list(family = "Trebuchet MS", size = 80, color = "grey31"),  xaxis = list(title = paste0("Number of Months Waiting (", wldate, ")")), showlegend = FALSE, margin = list(t=2,b=2,l=2,r=2))
+```
+
+## Waiting List by Hospital
+
+```{r owlByHosp}
+D = owl %>% subset(date==max(date)) %>% select(date, hosp, volume) %>% group_by(hosp) %>% mutate(volume=sum(volume)) %>% ungroup() %>% subset(duplicated(hosp)==FALSE) %>% arrange(-volume)
+
+D %>% pull(date) %>% unique() %>% format("%B %d, %Y") -> sbttl
+
+D %>% ggplot(aes(x = reorder(hosp, volume), y = volume, label = format(volume, big.mark = ","), fill = volume)) + geom_bar(stat = "identity") + coord_flip() + labs(title = "Outpatient Waiting List Total Volume By Hospital", subtitle = sbttl) + theme(panel.background = x, panel.grid.major.x = grid_line, axis.title = x, axis.line = x, axis.ticks = x, axis.text = f1, plot.title = title_style, plot.subtitle = subtitle_style) + scale_fill_gradient(high = "darkred", low = "pink") + geom_text(hjust = "left", family = "Trebuchet MS", size = txt_sz) + guides(fill = "none") + scale_y_continuous(limits = c(0, 1.05*max(D$volume)))
+#owlByHosp %>% plot_ly(x = ~volume, y = ~reorder(hosp, volume), marker = list(color = ~volume, height = 20)) %>% add_bars() %>% layout( yaxis = list(autotick = FALSE, title = ""), xaxis = list(title = paste0("Outpatient Waiting List Total (", wldate, ")")), font = list(family = "Trebuchet MS", size = 80, color = "grey31")) %>% add_annotations(text = ~format(volume, big.mark = ','), showarrow = FALSE, xanchor = "left")
+```
+
+## Waiting List (+15 Months) by Hospital
+
+```{r owlGT15ByHosp}
+D = owl %>% subset(date==max(date) & wait > 15) %>% select(date, hosp, volume) %>% group_by(hosp) %>% mutate(volume=sum(volume)) %>% ungroup() %>% subset(duplicated(hosp)==FALSE) %>% arrange(-volume)
+
+D %>% ggplot(aes(x = reorder(hosp, volume), y = volume, label = format(volume, big.mark = ","), fill = volume)) + geom_bar(stat = "identity") + coord_flip() + labs(title = "Outpatient Waiting List (+15 Months) Total Volume By Hospital", subtitle = sbttl) + theme(panel.background = x, panel.grid.major.x = grid_line, axis.title = x, axis.line = x, axis.ticks = x, axis.text = f1, plot.title = title_style, plot.subtitle = subtitle_style) + scale_fill_gradient(high = "darkred", low = "pink") + geom_text(hjust = "left", family = "Trebuchet MS", size = txt_sz) + guides(fill = "none") + scale_y_continuous(limits = c(0, 1.05*max(D$volume)))
+#owlByHosp %>% plot_ly(x = ~volume, y = ~reorder(hosp, volume), marker = list(color = ~volume, height = 20)) %>% add_bars() %>% layout( yaxis = list(autotick = FALSE, title = ""), xaxis = list(title = paste0("Outpatient Waiting List Total (+15 Months)(", wldate, ")")), font = list(family = "Trebuchet MS", size = 80, color = "grey31")) %>% add_annotations(text = ~format(volume, big.mark = ','), showarrow = FALSE, xanchor = "left")
+```
+
+
+
+## Waiting List by Specialty
+
+```{r owlBySpec}
+D = owl %>% subset(date==max(date)) %>% select(date, spec, volume) %>% group_by(spec) %>% mutate(volume=sum(volume)) %>% ungroup() %>% subset(duplicated(spec)==FALSE) %>% arrange(-volume)
+
+D %>% head(20) %>% ggplot(aes(x = reorder(spec, volume), y = volume, label = format(volume, big.mark = ","), fill = volume)) + geom_bar(stat = "identity") + coord_flip() + labs(title = "Top 20 Specialities on Outpatient Waiting List", subtitle = sbttl) + theme(panel.background = x, panel.grid.major.x = grid_line, axis.title = x, axis.line = x, axis.ticks = x, axis.text = f1, plot.title = title_style, plot.subtitle = subtitle_style) + scale_fill_gradient(high = "darkred", low = "pink") + geom_text(hjust = "left", family = "Trebuchet MS", size = txt_sz) + guides(fill = "none") + scale_y_continuous(limits = c(0, 1.05*max(D$volume)))
+#owlBySpec %>% plot_ly(x = ~volume, y = ~reorder(spec, volume), marker = list(color = ~volume, height = 20)) %>% add_bars() %>% layout( yaxis = list(autotick = FALSE, title = ""), xaxis = list(title = paste0("Outpatient Waiting List Total (", wldate, ")")), font = list(family = "Trebuchet MS", size = 80, color = "grey31")) %>% add_annotations(text = ~format(volume, big.mark = ','), showarrow = FALSE, xanchor = "left")
+```
+
+## Waiting List (+15 Months) by Specialty
+
+```{r owlGT15BySpec}
+D = owl %>% subset(date==max(date) & wait > 15) %>% select(date, spec, volume) %>% group_by(spec) %>% mutate(volume=sum(volume)) %>% ungroup() %>% subset(duplicated(spec)==FALSE) %>% arrange(-volume)
+
+D %>% head(20) %>% ggplot(aes(x = reorder(spec, volume), y = volume, label = format(volume, big.mark = ","), fill = volume)) + geom_bar(stat = "identity") + coord_flip() + labs(title = "Top 20 Specialities on Outpatient Waiting List (+15 Months)", subtitle = sbttl) + theme(panel.background = x, panel.grid.major.x = grid_line, axis.title = x, axis.line = x, axis.ticks = x, axis.text = f1, plot.title = title_style, plot.subtitle = subtitle_style) + scale_fill_gradient(high = "darkred", low = "pink") + geom_text(hjust = "left", family = "Trebuchet MS", size = txt_sz) + guides(fill = "none") + scale_y_continuous(limits = c(0, 1.05*max(D$volume)))
+#owlBySpec %>% plot_ly(x = ~volume, y = ~reorder(spec, volume), marker = list(color = ~volume, height = 20)) %>% add_bars() %>% layout( yaxis = list(autotick = FALSE, title = ""), xaxis = list(title = paste0("Outpatient Waiting List Total (+15 Months)(", wldate, ")")), font = list(family = "Trebuchet MS", size = 80, color = "grey31")) %>% add_annotations(text = ~format(volume, big.mark = ','), showarrow = FALSE, xanchor = "left")
+```
+
+# Outpatient Attendances & Referrals
+
+## Referrals Trend
+
+```{r referralstrend}
+read.csv(file="C:/Users/jack.lyons/Downloads/BIU Referral Data.csv", stringsAsFactors = FALSE) %>% 
+  
+  subset(Year >= 2018) %>% mutate(date=as.Date.character(Date, "%d/%m/%Y")) %>% 
+  
+  group_by(date) %>% mutate(referrals = sum(Referrals)) %>% ungroup() %>% 
+  
+  select(date, referrals) %>% distinct() %>% arrange(date) -> D
+
+D %>% ggplot(aes(x = date, y = referrals, label = format(referrals, big.mark = ","))) + geom_line(size = line_sz, color = blue) + geom_point(size = pnt_sz, color = blue) + labs(title = "Outpatient Referrals") + theme(panel.background = x, panel.grid.major = grid_line, axis.title = x, axis.line = x, axis.ticks = x, axis.text.y = f1, axis.text.x = f2, plot.title = title_style, plot.subtitle = subtitle_style) + scale_y_continuous(labels = scales::comma) + scale_x_date(breaks = D$date, labels = format(D$date, "%B %Y")) + geom_text(family = "Trebuchet MS", size = txt_sz)
+```
+
+## YTD Referrals by Specialty
+
+```{r outpatientReferralsBySpec}
+referralsBySpec = read.csv(file="C:/Users/jack.lyons/Downloads/BIU Referral Data.csv", stringsAsFactors = FALSE) %>% subset(Year==max(Year)) %>% group_by(Specialty) %>% mutate(referrals = sum(Referrals)) %>% ungroup() %>% select(Specialty, referrals, Year) %>% distinct() %>% arrange(-referrals) %>% head(20) 
+
+dt = format(unique(referralsBySpec$date), "%B %Y")
+y = as.numeric(max(referralsBySpec$Year))
+
+referralsBySpec %>% ggplot(aes(x = reorder(Specialty, referrals), y = referrals, label = format(referrals, big.mark = ","), fill = referrals)) + geom_bar(stat = "identity") + coord_flip() + labs(title = "Top 20 YTD Referrals by Specialty", subtitle = y) + theme(panel.background = x, panel.grid.major.x = grid_line, axis.title = x, axis.line = x, axis.ticks = x, axis.text = f1, plot.title = title_style, plot.subtitle = subtitle_style) + scale_fill_gradient(high = "darkred", low = "pink") + geom_text(hjust = "left", family = "Trebuchet MS", size = txt_sz) + guides(fill = "none") + scale_y_continuous(limits = c(0, 1.05*max(referralsBySpec$referrals)))
+
+# referralsBySpec %>% 
+#   
+#   plot_ly(showlegend = FALSE, x = ~referrals, y = ~reorder(Specialty, referrals), marker = ~list(color = referrals)) %>% 
+#   
+#   add_bars() %>% 
+#   
+#   add_annotations(showarrow = FALSE, text = ~format(referrals, big.mark = ','), xanchor = "left") %>% 
+#   
+#   layout( font = list(family = "Trebuchet MS", size = 80, color = "grey31"), xaxis = list(title = ""), yaxis = list(autotick = FALSE, title = ""))
+```
+
+## New & Review Attendances Trend
+
+```{r outpatientAttendancesTrend}
+read.csv("C:/Users/jack.lyons/Downloads/Activity Data.csv", stringsAsFactors = FALSE) %>% 
+  
+  subset(Year >= 2018) %>% 
+  
+  select(Date, New, Review) %>% 
+  
+  mutate(Date=as.Date.character(Date, "%d/%m/%Y")) %>% 
+  
+  group_by(Date) %>% 
+  
+  mutate(New=sum(New), Review = sum(Review)) %>% 
+  
+  ungroup() %>% 
+  
+  distinct() %>% 
+  
+  arrange(Date) %>% 
+  
+  mutate(ynew = (2*Review+New)/2, yreview = Review/2) -> D
+
+D %>% select(Date, New, Review) %>% melt(id.vars = "Date") %>% merge(y = D %>% select(Date, ynew, yreview), by = "Date", all = TRUE) %>% mutate(txt_y = ifelse(variable == "New", ynew, yreview)) %>% select(Date, variable, value, txt_y) -> D
+
+D %>% ggplot(aes(x = Date, fill = variable)) + geom_bar(stat = "identity", aes(y = value)) + theme(panel.background = x, legend.position = "top", axis.ticks.x = x, axis.line.y = element_line(),  legend.direction = "horizontal", axis.title = x, legend.title = x, axis.text.x = f2, title = title_style, axis.text.y = f1, legend.text = f1, panel.grid.major.y = element_line(size = 1, color = "grey31")) + labs(title = "OPD Attendances") + scale_fill_manual(values = c(blue, orange)) + scale_x_date(breaks = D$Date, labels = format(D$Date, "%B %Y")) + 
+  
+  geom_text(aes(label = format(value, big.mark = ","), y = txt_y), vjust = 0.4, hjust = 0.6, angle = 90, size = txt_sz, family = "Trebuchet MS") + 
+  
+  scale_y_continuous(labels = scales::comma) + theme(axis.ticks.y = element_line(size = 1)) + 
+  
+  guides(fill = guide_legend(override.aes = list(size = 30)))
+```
+
+## Review to New Ratio by Hospital
+
+```{r ratioByHosp}
+ratioByHosp = read.csv("C:/Users/jack.lyons/Downloads/Activity Data.csv", stringsAsFactors = FALSE) %>% mutate(Date = as.Date.character(Date, "%d/%m/%Y")) %>% subset(Date==max(Date)) %>% select(Date, New, Review, Hospital) %>% group_by(Hospital) %>% mutate(New=sum(New), Review = sum(Review)) %>% ungroup() %>% distinct() %>% mutate(ratio = ifelse(New == 0, NA, round(Review/New, 2))) %>% arrange(-ratio)
+
+ratioByHosp %>% ggplot(aes(x = reorder(Hospital, ratio), y = ratio, label = round(ratio, 1), fill = ratio)) + geom_bar(stat = "identity") + coord_flip() + geom_text(hjust = "left", size = txt_sz, family = "Trebuchet MS") + guides(fill = "none") + scale_fill_gradient(high = "darkred", low = "pink") + labs(title = "Ratio of Review to New Attendances", subtitle = ratioByHosp %>% pull(Date) %>% unique() %>% format("%B %Y")) + theme(panel.background = x, axis.line = x, axis.ticks = x, axis.title = x, axis.text = f1, plot.title = title_style, plot.subtitle = subtitle_style, panel.grid.major.x = grid_line) + scale_y_continuous(limits = c(0, 1.05*max(ratioByHosp$ratio)))
+
+#ratioByHosp %>% plot_ly(x = ~ratio, y = ~reorder(Hospital, ratio), showlegend = FALSE, marker = ~list(color = ratio)) %>% add_bars() %>% add_annotations(text = ~round(ratio, 1), xanchor = "left", showarrow = FALSE, xshift = -0.3, font = list(family = "Trebuchet MS", size = 80, color = "grey31")) %>% layout(font = list(family = "trebuchet MS", color = "grey31", size = 80), xaxis = list(title = "Ratio of Review to New Attendances"), yaxis = list(title = "", autotick = FALSE))
+```
+
+## Did Not Appear % by Hospital
+
+```{r alldnaByHosp}
+read.csv("C:/Users/jack.lyons/Downloads/Activity Data.csv", stringsAsFactors = FALSE) %>% 
+  
+  mutate(Date = as.Date.character(Date, "%d/%m/%Y")) %>% 
+  
+  subset(Date==max(Date)) %>% 
+  
+  select(Date, New, Review, New.DNA, Review.DNA, Hospital) %>% 
+  
+  group_by(Hospital) %>% 
+  
+  mutate(New=sum(New), Review = sum(Review), New.DNA = sum(New.DNA), Review.DNA = sum(Review.DNA)) %>% 
+  
+  ungroup() %>% 
+  
+  distinct() %>% 
+  
+  mutate(newDNARate = New.DNA/(New.DNA+New), reviewDNARate = Review.DNA/(Review+Review.DNA), allDNARate = (New.DNA+Review.DNA)/(New+Review+New.DNA+Review.DNA)) %>% 
+  
+  select(Date, Hospital, newDNARate, reviewDNARate, allDNARate) -> D
+
+f4 = element_text(family = "Trebuchet MS", color = "grey31", size = 100, angle = 90, hjust = 1)
+
+D %>% ggplot(aes(y = allDNARate, x = reorder(Hospital, -allDNARate), label = paste0(round(100*allDNARate, 1), "%"))) + 
+  
+  geom_bar(stat = "identity", fill = blue) + 
+  
+  scale_y_continuous(labels = scales::percent) + 
+  
+  geom_text(family = "Trebuchet MS", angle = 90, size = txt_sz, color = "white", vjust = "center", hjust = "right") + 
+  
+  theme(axis.text.x = f4, axis.text.y = x, axis.line = x, plot.title = title_style, plot.subtitle = subtitle_style, panel.background = x, axis.ticks = x, axis.title = x) + 
+  
+  labs(subtitle = D %>% pull(Date) %>% unique() %>% format("%B %Y"), title = "Did Not Appear % of All Appointments by Hospital")
+```
+
+## New Did Not Appear % by Hospital
+
+```{r newdnaByHosp}
+D %>% ggplot(aes(y = newDNARate, x = reorder(Hospital, -allDNARate), label = paste0(round(100*newDNARate, 1), "%"))) + 
+  
+  geom_bar(stat = "identity", fill = blue) + 
+  
+  scale_y_continuous(labels = scales::percent) + 
+  
+  geom_text(family = "Trebuchet MS", angle = 90, vjust = "center", hjust = "right", size = txt_sz, color = "white") + 
+  
+  theme(axis.text.x = f4, axis.text.y = x, axis.line = x, plot.title = title_style, plot.subtitle = subtitle_style, panel.background = x, axis.ticks = x, axis.title = x) + 
+  
+  labs(subtitle = D %>% pull(Date) %>% unique() %>% format("%B %Y"), title = "Did Not Appear % of New Appointments by Hospital")
+```
+
+## Review Did Not Appear % by Hospital
+
+```{r reviewdnaByHosp}
+D %>% ggplot(aes(y = reviewDNARate, x = reorder(Hospital, -allDNARate), label = paste0(round(100*reviewDNARate, 1), "%"))) + 
+  
+  geom_bar(stat = "identity", fill = blue) + 
+  
+  scale_y_continuous(labels = scales::percent) + 
+  
+  geom_text(family = "Trebuchet MS", angle = 90, vjust = "center", hjust = "right", color = "white", size = txt_sz) + 
+  
+  theme(axis.text.x = f4, axis.text.y = x, axis.line = x, plot.title = title_style, plot.subtitle = subtitle_style, panel.background = x, axis.ticks = x, axis.title = x) + 
+  
+  labs(subtitle = D %>% pull(Date) %>% unique() %>% format("%B %Y"), title = "Did Not Appear % of Review Appointments by Hospital")
+```
