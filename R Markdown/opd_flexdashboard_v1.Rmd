@@ -1,0 +1,133 @@
+---
+title: "Outpatient Department"
+output: 
+  flexdashboard::flex_dashboard:
+    # orientation: rows
+    vertical_layout: fill
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+rm(list=ls())
+
+library(flexdashboard)
+
+fls=list.files(
+  
+  path='~/Markdown/noned_kpi_dashboard/r_scripts/',
+  
+  pattern='.R',
+  
+  full.names=T
+  
+  )
+
+for(i in fls){source(i)}
+
+rm(i,fls)
+
+hse_group=0
+```
+
+OPD Waiting List Trend & Distribution
+=================================
+
+Row {.tabset}
+----------------
+
+### Trend
+```{r}
+op_waiting_list_trend(hse_group)
+```
+
+### Trend (+15 Months)
+```{r}
+op_waiting_list_gt15_trend(hse_group)
+```
+
+### Distribution
+```{r}
+op_waiting_list_distribution(hse_group)
+```
+
+OPD Waiting List Ranked
+=======================
+
+Column {.tabset}
+-----------------
+
+### Ranked By Hospital
+```{r}
+op_waiting_list_by_hospital(0)
+```
+
+### Ranked By Hospital (+15 Months)
+```{r}
+op_waiting_list_gt15_by_hospital(hse_group)
+```
+
+Column {.tabset}
+----------------
+
+### Ranked By Specialty
+```{r}
+op_waiting_list_by_specialty(hse_group)
+```
+
+### Ranked By Specialty (+15 Months)
+```{r}
+op_waiting_list_gt15_by_specialty(hse_group)
+```
+
+OPD Referrals
+=============
+
+Row {.tabset}
+-------------
+
+### Trend
+```{r}
+op_referrals_trend(hse_group)
+```
+
+### Ranked by Specialty (YTD)
+```{r}
+op_referrals_by_specialty(hse_group)
+```
+
+OPD Attendances
+=============
+
+Row {.tabset}
+-------------
+
+### New & Review Trend
+```{r}
+op_activity_trend(hse_group)
+```
+
+### Review To New Ratio By Hospital
+```{r}
+op_review_to_new_by_hospital(hse_group)
+```
+
+DNA Rates By Hospital
+=====================
+
+Row {.tabset}
+-------------
+
+### New DNA
+```{r}
+op_new_dna_rates(hse_group)
+```
+
+### Review DNA
+```{r}
+op_review_dna_rates(hse_group)
+```
+
+### All DNA
+```{r}
+op_all_dna_rates(hse_group)
+```
